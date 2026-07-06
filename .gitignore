@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+/dist/
+/build/
+frontend/dist/
+frontend/build/
+backend/dist/
+backend/build/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# Vite cache
+frontend/.vite/
+
+# Editor / OS files
+.vscode/
+.DS_Store
+Thumbs.db
