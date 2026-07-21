@@ -5,6 +5,7 @@ import http from 'http';
 import cors from 'cors';
 import { Server, Socket } from 'socket.io';
 import { connectDB } from './config/db.js';
+import knowledgeRoutes from './routes/knowledge.route'
 
 const app = express();
 
@@ -25,6 +26,8 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+app.use('/api/knowledge', knowledgeRoutes);
 
 const io = new Server(server, {
     cors: {
