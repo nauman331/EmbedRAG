@@ -4,7 +4,7 @@ import * as pdfParseModule from 'pdf-parse';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import Tenant from '../models/tenant.model';
-import Bot from '../models/bot.model';
+// import Bot from '../models/bot.model';
 import KnowledgeSource from '../models/knowledge.model';
 import DocumentChunk from '../models/documentchunk.model';
 import mongoose from 'mongoose';
