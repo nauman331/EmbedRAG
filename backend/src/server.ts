@@ -46,8 +46,8 @@ io.on('connection', (socket: Socket) => {
             const answer = await generateBotResponse(data.botId, data.message, data.history);
             socket.emit('bot_response', { answer });
         } catch (error: any) {
-            console.error('Error generating bot response:', error);
-            socket.emit('bot_error', { error: 'Sorry, I am having trouble connecting to my brain right now.' });
+            console.error('Error generating bot response:', error.message);
+            socket.emit('bot_error', { error: error.message || 'An unexpected error occurred.' });
         }
     });
 
@@ -59,6 +59,7 @@ io.on('connection', (socket: Socket) => {
 app.get('/api/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', message: 'Screened SaaS Backend is running.' });
 });
+
 
 server.listen(port, () => {
     console.log(`[Server]: Backend is running at http://localhost:${port}`);
