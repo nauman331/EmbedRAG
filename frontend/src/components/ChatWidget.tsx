@@ -29,7 +29,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        socketRef.current = io(import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000');
+        socketRef.current = io('http://localhost:5000');
         socketRef.current.on('bot_response', (data: { answer: string }) => {
             setMessages((prev) => [...prev, { role: 'bot', content: data.answer }]);
             setIsLoading(false);
