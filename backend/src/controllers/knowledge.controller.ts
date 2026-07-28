@@ -1,15 +1,15 @@
 import { Request, Response } from 'express';
 import multer from 'multer';
-import * as pdfParseModule from 'pdf-parse';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { OpenAIEmbeddings } from '@langchain/openai';
+import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import Tenant from '../models/tenant.model';
 import KnowledgeSource from '../models/knowledge.model';
 import DocumentChunk from '../models/documentchunk.model';
 import mongoose from 'mongoose';
 
 const storage = multer.memoryStorage();
-export const upload = multer({ storage })
+export const upload = multer({ storage });
 
 export const uploadKnowledge = async (req: Request, res: Response): Promise<any> => {
     try {
@@ -33,15 +33,20 @@ export const uploadKnowledge = async (req: Request, res: Response): Promise<any>
             status: 'PROCESSING'
         });
 
-        const parsePdf = (pdfParseModule as any).default || pdfParseModule;
-        const pdfData = await parsePdf(file.buffer);
-        const rawText = pdfData.text;
+        const blob = new Blob(
+            [file.buffer as unknown as BlobPart],
+            { type: 'application/pdf' }
+        );
+        const loader = new PDFLoader(blob);
+
+        const rawDocs = await loader.load();
 
         const textSplitter = new RecursiveCharacterTextSplitter({
             chunkSize: 1000,
             chunkOverlap: 200,
         });
-        const docs = await textSplitter.createDocuments([rawText]);
+
+        const docs = await textSplitter.splitDocuments(rawDocs);
 
         const embeddings = new OpenAIEmbeddings({
             openAIApiKey: tenant.apiKeys.openai,
@@ -71,8 +76,15 @@ export const uploadKnowledge = async (req: Request, res: Response): Promise<any>
             chunksCreated: chunkDocs.length
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error processing knowledge upload:', error);
-        return res.status(500).json({ error: 'Failed to process document.' });
+
+        if (error?.status === 401 || error?.message?.includes('Incorrect API key')) {
+            return res.status(401).json({
+                error: '🔒 Authentication failed with OpenAI. Please check your API key in the dashboard.'
+            });
+        }
+
+        return res.status(500).json({ error: error.message || 'Failed to process document.' });
     }
 };
