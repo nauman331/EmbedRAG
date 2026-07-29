@@ -29,7 +29,14 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        if (messages.length === 1 && messages[0].role === 'bot') {
+            setMessages([{ role: 'bot', content: welcomeMessage }]);
+        }
+    }, [welcomeMessage]);
+
+    useEffect(() => {
         socketRef.current = io('http://localhost:5000');
+
         socketRef.current.on('bot_response', (data: { answer: string }) => {
             setMessages((prev) => [...prev, { role: 'bot', content: data.answer }]);
             setIsLoading(false);
@@ -90,7 +97,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                         padding: '16px',
                         display: 'flex',
                         justifyContent: 'space-between',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        transition: 'background-color 0.3s ease'
                     }}>
                         <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>{botName}</h3>
                         <button
@@ -113,7 +121,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                                 maxWidth: '80%',
                                 boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
                                 fontSize: '14px',
-                                lineHeight: '1.4'
+                                lineHeight: '1.4',
+                                transition: 'background-color 0.3s ease'
                             }}>
                                 {msg.content}
                             </div>
@@ -145,7 +154,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                                 padding: '0 16px',
                                 borderRadius: '6px',
                                 cursor: isLoading ? 'not-allowed' : 'pointer',
-                                opacity: isLoading ? 0.7 : 1
+                                opacity: isLoading ? 0.7 : 1,
+                                transition: 'background-color 0.3s ease'
                             }}
                         >
                             Send
@@ -171,7 +181,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                     position: 'absolute',
                     bottom: 0,
                     right: 0,
-                    transition: 'transform 0.2s',
+                    transition: 'all 0.3s ease',
                     transform: isOpen ? 'scale(0)' : 'scale(1)'
                 }}
             >
