@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import multer from 'multer';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { OpenAIEmbeddings } from '@langchain/openai';
+import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import Tenant from '../models/tenant.model';
 import KnowledgeSource from '../models/knowledge.model';
@@ -21,8 +21,8 @@ export const uploadKnowledge = async (req: Request, res: Response): Promise<any>
         }
 
         const tenant = await Tenant.findById(tenantId);
-        if (!tenant || !tenant.apiKeys?.openai) {
-            return res.status(400).json({ error: 'Tenant not found or missing OpenAI API Key for embeddings.' });
+        if (!tenant || !tenant.apiKeys?.gemini) {
+            return res.status(400).json({ error: 'Tenant not found or missing Gemini API Key for embeddings.' });
         }
 
         const knowledgeSource = await KnowledgeSource.create({
@@ -48,9 +48,9 @@ export const uploadKnowledge = async (req: Request, res: Response): Promise<any>
 
         const docs = await textSplitter.splitDocuments(rawDocs);
 
-        const embeddings = new OpenAIEmbeddings({
-            openAIApiKey: tenant.apiKeys.openai,
-            modelName: 'text-embedding-3-small',
+        const embeddings = new GoogleGenerativeAIEmbeddings({
+            apiKey: tenant.apiKeys.gemini,
+            modelName: 'gemini-embedding-001',
         });
 
         const textsToEmbed = docs.map(doc => doc.pageContent);
@@ -79,9 +79,9 @@ export const uploadKnowledge = async (req: Request, res: Response): Promise<any>
     } catch (error: any) {
         console.error('Error processing knowledge upload:', error);
 
-        if (error?.status === 401 || error?.message?.includes('Incorrect API key')) {
+        if (error?.status === 401 || error?.status === 429 || error?.message?.includes('API key')) {
             return res.status(401).json({
-                error: '🔒 Authentication failed with OpenAI. Please check your API key in the dashboard.'
+                error: '🔒 Authentication or Quota failed with Gemini. Please check your API key in the dashboard.'
             });
         }
 

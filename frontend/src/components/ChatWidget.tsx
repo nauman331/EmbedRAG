@@ -37,13 +37,34 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     useEffect(() => {
         socketRef.current = io('http://localhost:5000');
 
-        socketRef.current.on('bot_response', (data: { answer: string }) => {
-            setMessages((prev) => [...prev, { role: 'bot', content: data.answer }]);
+        socketRef.current.on('bot_response_chunk', (data: { chunk: string }) => {
             setIsLoading(false);
+            setMessages((prev) => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+
+                if (lastMessage.role === 'bot') {
+                    lastMessage.content += data.chunk;
+                }
+                return newMessages;
+            });
+        });
+
+        socketRef.current.on('bot_response_done', () => {
+            console.log('Bot response completed.');
         });
 
         socketRef.current.on('bot_error', (data: { error: string }) => {
-            setMessages((prev) => [...prev, { role: 'bot', content: `❌ ${data.error}` }]);
+            setMessages((prev) => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                if (lastMessage.role === 'bot' && lastMessage.content === '') {
+                    lastMessage.content = `❌ ${data.error}`;
+                } else {
+                    newMessages.push({ role: 'bot', content: `❌ ${data.error}` });
+                }
+                return newMessages;
+            });
             setIsLoading(false);
         });
 
@@ -62,7 +83,12 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
         const userMessage = inputText.trim();
 
-        setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+        setMessages((prev) => [
+            ...prev,
+            { role: 'user', content: userMessage },
+            { role: 'bot', content: '' }
+        ]);
+
         setInputText('');
         setIsLoading(true);
 
@@ -112,27 +138,25 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                     {/* Messages Area */}
                     <div style={{ flex: 1, padding: '16px', overflowY: 'auto', backgroundColor: '#f9f9f9', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {messages.map((msg, idx) => (
-                            <div key={idx} style={{
-                                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                                backgroundColor: msg.role === 'user' ? primaryColor : '#ffffff',
-                                color: msg.role === 'user' ? 'white' : '#333333',
-                                padding: '10px 14px',
-                                borderRadius: '8px',
-                                maxWidth: '80%',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                                fontSize: '14px',
-                                lineHeight: '1.4',
-                                transition: 'background-color 0.3s ease'
-                            }}>
-                                {msg.content}
-                            </div>
+                            // Hide the empty bot message until chunks start arriving (unless loading)
+                            (msg.content !== '' || isLoading) ? (
+                                <div key={idx} style={{
+                                    alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                                    backgroundColor: msg.role === 'user' ? primaryColor : '#ffffff',
+                                    color: msg.role === 'user' ? 'white' : '#333333',
+                                    padding: '10px 14px',
+                                    borderRadius: '8px',
+                                    maxWidth: '80%',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                                    fontSize: '14px',
+                                    lineHeight: '1.4',
+                                    transition: 'background-color 0.3s ease',
+                                    whiteSpace: 'pre-wrap'
+                                }}>
+                                    {msg.content === '' ? 'Thinking...' : msg.content}
+                                </div>
+                            ) : null
                         ))}
-
-                        {isLoading && (
-                            <div style={{ alignSelf: 'flex-start', backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '8px', fontSize: '14px', color: '#666' }}>
-                                Thinking...
-                            </div>
-                        )}
                         <div ref={messagesEndRef} />
                     </div>
 

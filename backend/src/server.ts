@@ -42,14 +42,21 @@ const io = new Server(server, {
 
 io.on('connection', (socket: Socket) => {
     console.log(`⚡ [Socket connected]: Client ID ${socket.id}`);
-    socket.on('chat_message', async (data: { botId: string; message: string; history?: any[] }) => {
+
+    socket.on('chat_message', async (data: { botId: string, message: string, history: any[] }) => {
+        console.log(`💬 Received message for Bot ${data.botId}: "${data.message}"`);
         try {
-            console.log(`💬 Received message for Bot ${data.botId}: "${data.message}"`);
-            const answer = await generateBotResponse(data.botId, data.message, data.history);
-            socket.emit('bot_response', { answer });
+            const stream = await generateBotResponse(data.botId, data.message, data.history);
+            for await (const chunk of stream) {
+                socket.emit('bot_response_chunk', { chunk });
+            }
+            socket.emit('bot_response_done');
+
         } catch (error: any) {
-            console.error('Error generating bot response:', error.message);
-            socket.emit('bot_error', { error: error.message || 'An unexpected error occurred.' });
+            console.error('Error generating bot response:', error);
+            socket.emit('bot_error', {
+                error: error.message || 'I encountered an error while thinking. Please try again.'
+            });
         }
     });
 

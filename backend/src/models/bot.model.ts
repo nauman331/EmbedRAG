@@ -28,12 +28,12 @@ const BotSchema: Schema = new Schema(
         llmProvider: {
             type: String,
             enum: ['OPENAI', 'ANTHROPIC', 'GEMINI'],
-            default: 'OPENAI',
+            default: 'GEMINI',
             required: true
         },
         llmModel: {
             type: String,
-            default: 'gpt-4o-mini',
+            default: 'gemini-3.6-flash',
             required: true
         },
         systemPrompt: {
