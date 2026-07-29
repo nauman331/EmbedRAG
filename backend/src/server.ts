@@ -5,7 +5,8 @@ import http from 'http';
 import cors from 'cors';
 import { Server, Socket } from 'socket.io';
 import { connectDB } from './config/db.js';
-import knowledgeRoutes from './routes/knowledge.route'
+import knowledgeRoutes from './routes/knowledge.route';
+import botRoutes from './routes/bot.route';
 import { generateBotResponse } from './ai/agent.js';
 
 const app = express();
@@ -29,6 +30,7 @@ app.use(cors({
 app.use(express.json());
 
 app.use('/api/knowledge', knowledgeRoutes);
+app.use('/api/bots', botRoutes);
 
 const io = new Server(server, {
     cors: {
