@@ -39,12 +39,17 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
         socketRef.current.on('bot_response_chunk', (data: { chunk: string }) => {
             setIsLoading(false);
+
             setMessages((prev) => {
                 const newMessages = [...prev];
-                const lastMessage = newMessages[newMessages.length - 1];
+                const lastIndex = newMessages.length - 1;
+                const lastMessage = newMessages[lastIndex];
 
                 if (lastMessage.role === 'bot') {
-                    lastMessage.content += data.chunk;
+                    newMessages[lastIndex] = {
+                        ...lastMessage,
+                        content: lastMessage.content + data.chunk
+                    };
                 }
                 return newMessages;
             });
@@ -138,7 +143,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                     {/* Messages Area */}
                     <div style={{ flex: 1, padding: '16px', overflowY: 'auto', backgroundColor: '#f9f9f9', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {messages.map((msg, idx) => (
-                            // Hide the empty bot message until chunks start arriving (unless loading)
                             (msg.content !== '' || isLoading) ? (
                                 <div key={idx} style={{
                                     alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
