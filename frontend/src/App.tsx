@@ -35,6 +35,22 @@ const App: React.FC = () => {
     return () => window.removeEventListener('bot_settings_updated', fetchConfig);
   }, []);
 
+  const path = window.location.pathname;
+
+  if (path.startsWith('/widget/')) {
+    const pathBotId = path.split('/')[2];
+    return (
+      <div className="bg-transparent h-screen w-screen overflow-hidden">
+        <ChatWidget
+          botId={pathBotId}
+          botName={botConfig.name}
+          primaryColor={botConfig.colorHex}
+          welcomeMessage={botConfig.welcomeMessage}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
 

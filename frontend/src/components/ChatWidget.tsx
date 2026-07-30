@@ -84,6 +84,14 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
+    useEffect(() => {
+        if (isOpen) {
+            window.parent.postMessage('embedai-open', '*');
+        } else {
+            window.parent.postMessage('embedai-close', '*');
+        }
+    }, [isOpen]);
+
     const handleSendMessage = (e: React.FormEvent) => {
         e.preventDefault();
         if (!inputText.trim() || !socketRef.current) return;
@@ -108,7 +116,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
     return (
         <div className="fixed bottom-6 right-6 z-[9999] font-sans antialiased">
-            {/* Custom keyframes for specific bouncy animations not built into standard Tailwind */}
             <style>
                 {`
                 @keyframes chatOpen {

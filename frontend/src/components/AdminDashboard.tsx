@@ -7,7 +7,7 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId }) => {
-    const [activeTab, setActiveTab] = useState<'knowledge' | 'settings'>('knowledge');
+    const [activeTab, setActiveTab] = useState<'knowledge' | 'settings' | 'install'>('knowledge');
 
     const [file, setFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -149,6 +149,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                         Bot Settings
+                    </button>
+
+                    { }
+                    <button
+                        onClick={() => setActiveTab('install')}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'install' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                        Install to Website
                     </button>
                 </div>
             </aside>
@@ -295,6 +304,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                         </>
                                     )}
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                { }
+                {activeTab === 'install' && (
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <h2 className="text-2xl font-bold text-slate-800 mb-2">Install Your Bot</h2>
+                        <p className="text-slate-500 mb-8">Copy and paste this code snippet into the <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">&lt;body&gt;</code> of your website to add the chat widget.</p>
+
+                        <div className="bg-slate-900 rounded-xl overflow-hidden shadow-lg border border-slate-700">
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800">
+                                <div className="flex gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                </div>
+                                <button
+                                    onClick={() => navigator.clipboard.writeText(`<script src="http://localhost:5000/api/bots/embed/${botId}"></script>`)}
+                                    className="text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded transition-colors"
+                                >
+                                    Copy Code
+                                </button>
+                            </div>
+                            <div className="p-6 overflow-x-auto">
+                                <pre className="text-sm font-mono text-emerald-400">
+                                    <code>
+                                        &lt;script src="http://localhost:5000/api/bots/embed/{botId}"&gt;&lt;/script&gt;
+                                    </code>
+                                </pre>
+                            </div>
+                        </div>
+
+                        <div className="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-5 flex gap-4">
+                            <div className="mt-1 text-blue-600">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            </div>
+                            <div>
+                                <h4 className="font-semibold text-blue-900 mb-1">How it works</h4>
+                                <p className="text-sm text-blue-800 leading-relaxed">
+                                    This script is a tiny snippet that injects a secure iframe into your website. It completely isolates the bot's styling from your website's CSS, ensuring it always looks perfect and never breaks your existing layout.
+                                </p>
                             </div>
                         </div>
                     </div>
