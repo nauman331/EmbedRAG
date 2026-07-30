@@ -7,7 +7,7 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId }) => {
-    const [activeTab, setActiveTab] = useState<'knowledge' | 'settings' | 'install'>('knowledge');
+    const [activeTab, setActiveTab] = useState<'knowledge' | 'settings' | 'install' | 'inbox'>('knowledge');
 
     const [file, setFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -23,6 +23,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
 
     const [showColorPicker, setShowColorPicker] = useState(false);
     const colorPickerRef = useRef<HTMLDivElement>(null);
+
+    const [conversations, setConversations] = useState<any[]>([]);
+    const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (activeTab === 'inbox') {
+            fetch(`http://localhost:5000/api/conversations/${botId}`)
+                .then(res => res.json())
+                .then(data => setConversations(data))
+                .catch(err => console.error("Failed to fetch conversations", err));
+        }
+    }, [activeTab, botId]);
 
     useEffect(() => {
         const fetchBotConfig = async () => {
@@ -158,6 +170,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                         Install to Website
+                    </button>
+
+                    <button
+                        onClick={() => setActiveTab('inbox')}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'inbox' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><polyline points="21 3 15 3 15 7 9 7 9 3 3 3 3 21 21 21 21 3z"></polyline><path d="M21 3L3 3M15 3L9 3"></path></svg>
+                        Inbox
                     </button>
                 </div>
             </aside>
@@ -348,6 +368,67 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                     This script is a tiny snippet that injects a secure iframe into your website. It completely isolates the bot's styling from your website's CSS, ensuring it always looks perfect and never breaks your existing layout.
                                 </p>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* INBOX TAB */}
+                {activeTab === 'inbox' && (
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        {/* Left side: List of conversations */}
+                        <div className="w-1/3 border-r border-slate-200 overflow-y-auto bg-slate-50 flex flex-col">
+                            <div className="p-4 border-b border-slate-200 bg-white sticky top-0 z-10 shadow-sm">
+                                <h3 className="font-bold text-slate-800">Chat History</h3>
+                                <p className="text-xs text-slate-500 mt-1">Live customer conversations</p>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto">
+                                {conversations.length === 0 ? (
+                                    <div className="p-8 text-center text-slate-500 text-sm flex flex-col items-center">
+                                        <svg className="w-10 h-10 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                                        No conversations yet.
+                                    </div>
+                                ) : (
+                                    conversations.map((conv) => (
+                                        <div
+                                            key={conv._id}
+                                            onClick={() => setSelectedSessionId(conv.sessionId)}
+                                            className={`p-4 border-b border-slate-100 cursor-pointer transition-colors ${selectedSessionId === conv.sessionId ? 'bg-blue-50 border-l-4 border-l-blue-600' : 'hover:bg-slate-100 border-l-4 border-l-transparent'}`}
+                                        >
+                                            <div className="flex justify-between items-start mb-1">
+                                                <span className="text-sm font-semibold text-slate-700">Visitor {conv.sessionId.substring(5, 9).toUpperCase()}</span>
+                                                <span className="text-xs text-slate-400 font-medium">{new Date(conv.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                                            </div>
+                                            <div className="text-xs text-slate-600 truncate mt-1">
+                                                {conv.messages[conv.messages.length - 1]?.content || 'Empty chat'}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Right side: Messages */}
+                        <div className="w-2/3 flex flex-col bg-white">
+                            {selectedSessionId ? (
+                                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                    {conversations.find(c => c.sessionId === selectedSessionId)?.messages.map((msg: any, i: number) => (
+                                        <div key={i} className={`flex flex-col max-w-[85%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
+                                            <span className="text-[11px] text-slate-400 mb-1.5 mx-2 font-medium">
+                                                {msg.role === 'user' ? 'Visitor' : 'AI Assistant'} • {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                            <div className={`px-4 py-3 rounded-2xl text-[14px] leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-slate-50 border border-slate-100 text-slate-800 rounded-bl-sm whitespace-pre-wrap'}`}>
+                                                {msg.content}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50/50">
+                                    <svg className="w-16 h-16 text-slate-200 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path></svg>
+                                    Select a conversation to view the transcript
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

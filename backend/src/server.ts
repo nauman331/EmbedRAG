@@ -8,6 +8,7 @@ import { connectDB } from './config/db.js';
 import knowledgeRoutes from './routes/knowledge.route';
 import botRoutes from './routes/bot.route';
 import { generateBotResponse } from './ai/agent.js';
+import Conversation from "./models/conversation.model"
 
 const app = express();
 
@@ -43,13 +44,27 @@ const io = new Server(server, {
 io.on('connection', (socket: Socket) => {
     console.log(`⚡ [Socket connected]: Client ID ${socket.id}`);
 
-    socket.on('chat_message', async (data: { botId: string, message: string, history: any[] }) => {
+    socket.on('chat_message', async (data: { botId: string, message: string, history: any[], sessionId: string }) => {
         console.log(`💬 Received message for Bot ${data.botId}: "${data.message}"`);
         try {
             const stream = await generateBotResponse(data.botId, data.message, data.history);
+            let fullBotResponse = '';
             for await (const chunk of stream) {
+                fullBotResponse += chunk;
                 socket.emit('bot_response_chunk', { chunk });
             }
+            await Conversation.findOneAndUpdate(
+                { botId: data.botId, sessionId: data.sessionId },
+                {
+                    $push: {
+                        messages: [
+                            { role: 'user', content: data.message, createdAt: new Date() },
+                            { role: 'bot', content: fullBotResponse, createdAt: new Date() }
+                        ]
+                    }
+                },
+                { upsert: true, new: true }
+            );
             socket.emit('bot_response_done');
 
         } catch (error: any) {

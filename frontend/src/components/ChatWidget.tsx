@@ -27,6 +27,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
 
+    const [sessionId] = useState(() => 'sess_' + Math.random().toString(36).substring(2, 15));
+
     const socketRef = useRef<Socket | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -109,6 +111,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
         socketRef.current.emit('chat_message', {
             botId,
+            sessionId,
             message: userMessage,
             history: messages
         });
@@ -116,6 +119,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
     return (
         <div className="fixed bottom-6 right-6 z-[9999] font-sans antialiased">
+            {/* Custom keyframes for specific bouncy animations not built into standard Tailwind */}
             <style>
                 {`
                 @keyframes chatOpen {

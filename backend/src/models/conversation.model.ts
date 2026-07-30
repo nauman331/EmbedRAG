@@ -1,0 +1,41 @@
+import mongoose, { Schema, Document, Types } from 'mongoose';
+
+export interface IMessage {
+    role: 'user' | 'bot';
+    content: string;
+    createdAt: Date;
+}
+
+export interface IConversation extends Document {
+    botId: Types.ObjectId;
+    sessionId: string;
+    messages: IMessage[];
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+const MessageSchema: Schema = new Schema({
+    role: { type: String, enum: ['user', 'bot'], required: true },
+    content: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+});
+
+const ConversationSchema: Schema = new Schema(
+    {
+        botId: {
+            type: Schema.Types.ObjectId,
+            ref: 'Bot',
+            required: true,
+            index: true,
+        },
+        sessionId: {
+            type: String,
+            required: true,
+            index: true,
+        },
+        messages: [MessageSchema]
+    },
+    { timestamps: true }
+);
+
+export default mongoose.model<IConversation>('Conversation', ConversationSchema);
