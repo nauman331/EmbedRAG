@@ -36,16 +36,29 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div style={{ padding: '40px', fontFamily: 'sans-serif', backgroundColor: '#f1f5f9', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
 
-      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-        <h1 style={{ color: '#0f172a' }}>EmbedAI Admin Dashboard</h1>
-        <p style={{ color: '#64748b' }}>Manage your custom AI assistant and knowledge base.</p>
-        <p style={{ color: '#64748b', fontSize: '14px', fontStyle: 'italic' }}>Look in the bottom right corner to see the live chat widget preview!</p>
+      {/* Top Navigation Bar */}
+      <nav className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-800">EmbedAI</h1>
+        </div>
+        <div className="text-sm font-medium text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
+          Preview Mode Active
+        </div>
+      </nav>
+
+      {/* Main Dashboard Content */}
+      <div className="flex-1 w-full max-w-7xl mx-auto p-6">
+        <AdminDashboard botId={DUMMY_BOT_ID} tenantId={DUMMY_TENANT_ID} />
       </div>
-
-      {/* Render the Admin Panel */}
-      <AdminDashboard botId={DUMMY_BOT_ID} tenantId={DUMMY_TENANT_ID} />
 
       {/* Render the floating chat widget with dynamic props */}
       <ChatWidget

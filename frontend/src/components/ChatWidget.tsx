@@ -25,6 +25,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     ]);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
+
     const socketRef = useRef<Socket | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -105,115 +107,134 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     };
 
     return (
-        <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999, fontFamily: 'sans-serif' }}>
+        <div className="fixed bottom-6 right-6 z-[9999] font-sans antialiased">
+            {/* Custom keyframes for specific bouncy animations not built into standard Tailwind */}
+            <style>
+                {`
+                @keyframes chatOpen {
+                    from { opacity: 0; transform: scale(0.8) translateY(20px); }
+                    to { opacity: 1; transform: scale(1) translateY(0); }
+                }
+                @keyframes messagePop {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                `}
+            </style>
 
             {isOpen && (
-                <div style={{
-                    width: '350px',
-                    height: '500px',
-                    backgroundColor: '#ffffff',
-                    borderRadius: '12px',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden',
-                    marginBottom: '16px',
-                    border: '1px solid #e0e0e0'
-                }}>
-
+                <div
+                    className="w-[360px] h-[600px] sm:w-[380px] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden mb-5 border border-slate-100 origin-bottom-right"
+                    style={{ animation: 'chatOpen 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
+                >
                     {/* Header */}
-                    <div style={{
-                        backgroundColor: primaryColor,
-                        color: 'white',
-                        padding: '16px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        transition: 'background-color 0.3s ease'
-                    }}>
-                        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>{botName}</h3>
+                    <div
+                        className="text-white px-6 py-5 flex justify-between items-center shadow-sm z-10"
+                        style={{ backgroundColor: primaryColor }}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-white/20 flex justify-center items-center overflow-hidden backdrop-blur-sm">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="3" y="11" width="18" height="10" rx="2" ry="2"></rect>
+                                    <circle cx="12" cy="5" r="2"></circle>
+                                    <path d="M12 7v4"></path>
+                                    <line x1="8" y1="16" x2="8" y2="16"></line>
+                                    <line x1="16" y1="16" x2="16" y2="16"></line>
+                                </svg>
+                            </div>
+                            <h3 className="m-0 text-base font-semibold tracking-wide">{botName}</h3>
+                        </div>
                         <button
                             onClick={() => setIsOpen(false)}
-                            style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '20px' }}
+                            className="text-white/80 hover:text-white hover:bg-white/10 p-1.5 rounded-full transition-colors flex items-center justify-center"
                         >
-                            ×
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                         </button>
                     </div>
 
                     {/* Messages Area */}
-                    <div style={{ flex: 1, padding: '16px', overflowY: 'auto', backgroundColor: '#f9f9f9', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="flex-1 p-5 overflow-y-auto bg-slate-50 flex flex-col gap-4 scroll-smooth">
                         {messages.map((msg, idx) => (
                             (msg.content !== '' || isLoading) ? (
-                                <div key={idx} style={{
-                                    alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                                    backgroundColor: msg.role === 'user' ? primaryColor : '#ffffff',
-                                    color: msg.role === 'user' ? 'white' : '#333333',
-                                    padding: '10px 14px',
-                                    borderRadius: '8px',
-                                    maxWidth: '80%',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                                    fontSize: '14px',
-                                    lineHeight: '1.4',
-                                    transition: 'background-color 0.3s ease',
-                                    whiteSpace: 'pre-wrap'
-                                }}>
-                                    {msg.content === '' ? 'Thinking...' : msg.content}
+                                <div
+                                    key={idx}
+                                    className={`max-w-[85%] flex flex-col ${msg.role === 'user' ? 'self-end' : 'self-start'}`}
+                                    style={{ animation: 'messagePop 0.3s ease-out forwards' }}
+                                >
+                                    {msg.role === 'bot' && idx === 0 && (
+                                        <span className="text-xs text-slate-500 mb-1 ml-3 font-medium">Assistant</span>
+                                    )}
+                                    <div
+                                        className={`px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap break-words shadow-sm
+                                            ${msg.role === 'user'
+                                                ? 'rounded-[20px] rounded-br-sm text-white'
+                                                : 'rounded-[20px] rounded-bl-sm bg-white text-slate-700 border border-slate-100'
+                                            }
+                                        `}
+                                        style={msg.role === 'user' ? { backgroundColor: primaryColor } : {}}
+                                    >
+                                        {msg.content === '' ? (
+                                            <span className="flex gap-1.5 items-center h-5 px-1">
+                                                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                                            </span>
+                                        ) : msg.content}
+                                    </div>
                                 </div>
                             ) : null
                         ))}
-                        <div ref={messagesEndRef} />
+                        <div ref={messagesEndRef} className="h-px" />
                     </div>
 
-                    <form onSubmit={handleSendMessage} style={{ padding: '12px', backgroundColor: '#ffffff', borderTop: '1px solid #eee', display: 'flex', gap: '8px' }}>
+                    {/* Input Area */}
+                    <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-100 flex gap-3 items-center">
                         <input
                             type="text"
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
-                            placeholder="Type your message..."
-                            style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #ccc', outline: 'none' }}
+                            onFocus={() => setIsFocused(true)}
+                            onBlur={() => setIsFocused(false)}
+                            placeholder="Type a message..."
+                            className="flex-1 px-5 py-3.5 rounded-full border outline-none text-[15px] transition-all duration-200"
+                            style={{
+                                backgroundColor: isFocused ? '#ffffff' : '#f8fafc',
+                                borderColor: isFocused ? primaryColor : '#e2e8f0',
+                                boxShadow: isFocused ? `0 0 0 3px ${primaryColor}20` : 'none'
+                            }}
                         />
                         <button
                             type="submit"
                             disabled={isLoading || !inputText.trim()}
+                            className="w-12 h-12 rounded-full flex justify-center items-center transition-all duration-200 disabled:cursor-default"
                             style={{
-                                backgroundColor: primaryColor,
-                                color: 'white',
-                                border: 'none',
-                                padding: '0 16px',
-                                borderRadius: '6px',
-                                cursor: isLoading ? 'not-allowed' : 'pointer',
-                                opacity: isLoading ? 0.7 : 1,
-                                transition: 'background-color 0.3s ease'
+                                backgroundColor: inputText.trim() ? primaryColor : '#f1f5f9',
+                                color: inputText.trim() ? 'white' : '#94a3b8',
+                                boxShadow: inputText.trim() ? `0 4px 12px ${primaryColor}40` : 'none',
+                                transform: inputText.trim() && !isLoading ? 'scale(1.05)' : 'scale(1)'
                             }}
                         >
-                            Send
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="translate-x-[2px]">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
                         </button>
                     </form>
                 </div>
             )}
 
+            {/* Floating Action Button (FAB) */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
+                className={`absolute bottom-0 right-0 w-16 h-16 rounded-full text-white flex justify-center items-center transition-all duration-300 hover:-translate-y-1 hover:scale-105 group
+                    ${isOpen ? 'scale-0 opacity-0 pointer-events-none' : 'scale-100 opacity-100'}
+                `}
                 style={{
-                    width: '60px',
-                    height: '60px',
-                    borderRadius: '50%',
                     backgroundColor: primaryColor,
-                    color: 'white',
-                    border: 'none',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    position: 'absolute',
-                    bottom: 0,
-                    right: 0,
-                    transition: 'all 0.3s ease',
-                    transform: isOpen ? 'scale(0)' : 'scale(1)'
+                    boxShadow: `0 8px 24px ${primaryColor}50`
                 }}
             >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-300 group-hover:rotate-12">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                 </svg>
             </button>

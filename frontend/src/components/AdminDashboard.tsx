@@ -54,9 +54,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
         if (showColorPicker) {
             document.addEventListener('mousedown', handleClickOutside);
         }
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showColorPicker]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -122,7 +120,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
             if (!response.ok) throw new Error(data.error || 'Failed to update settings');
 
             setSaveStatus({ type: 'success', message: 'Settings saved successfully!' });
-
             window.dispatchEvent(new Event('bot_settings_updated'));
 
         } catch (error: any) {
@@ -133,154 +130,176 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     };
 
     return (
-        <div style={{ maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif', backgroundColor: '#ffffff', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+        <div className="flex flex-col md:flex-row gap-8 mt-4">
 
-            {/* Header & Tabs */}
-            <div style={{ backgroundColor: '#1e293b', color: 'white', padding: '24px' }}>
-                <h2 style={{ margin: 0, fontSize: '24px' }}>Bot Dashboard</h2>
-                <p style={{ margin: '8px 0 0 0', color: '#94a3b8' }}>Manage your custom AI assistant and knowledge base.</p>
-
-                <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
+            {/* Sidebar Navigation */}
+            <aside className="w-full md:w-64 flex-shrink-0">
+                <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col gap-2">
                     <button
                         onClick={() => setActiveTab('knowledge')}
-                        style={{
-                            background: 'none', border: 'none', color: activeTab === 'knowledge' ? '#60a5fa' : 'white',
-                            cursor: 'pointer', fontSize: '16px', fontWeight: activeTab === 'knowledge' ? 600 : 400,
-                            padding: '8px 0', borderBottom: activeTab === 'knowledge' ? '2px solid #60a5fa' : '2px solid transparent',
-                            transition: 'all 0.2s ease'
-                        }}>
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'knowledge' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
                         Knowledge Base
                     </button>
+
                     <button
                         onClick={() => setActiveTab('settings')}
-                        style={{
-                            background: 'none', border: 'none', color: activeTab === 'settings' ? '#60a5fa' : 'white',
-                            cursor: 'pointer', fontSize: '16px', fontWeight: activeTab === 'settings' ? 600 : 400,
-                            padding: '8px 0', borderBottom: activeTab === 'settings' ? '2px solid #60a5fa' : '2px solid transparent',
-                            transition: 'all 0.2s ease'
-                        }}>
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                         Bot Settings
                     </button>
                 </div>
-            </div>
+            </aside>
 
-            <div style={{ padding: '32px' }}>
-
-                {/* KNOWLEDGE TAB */}
+            {/* Main Content Area */}
+            <main className="flex-1 min-w-0">
+                { }
                 {activeTab === 'knowledge' && (
-                    <div style={{
-                        border: '2px dashed #cbd5e1',
-                        borderRadius: '8px',
-                        padding: '40px',
-                        textAlign: 'center',
-                        backgroundColor: '#f8fafc'
-                    }}>
-                        <input type="file" accept="application/pdf" onChange={handleFileChange} ref={fileInputRef} style={{ display: 'none' }} id="file-upload" />
-                        <label htmlFor="file-upload" style={{ display: 'inline-block', backgroundColor: '#3b82f6', color: 'white', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, marginBottom: '16px', transition: 'background-color 0.2s' }}>
-                            {file ? 'Change File' : 'Select PDF Document'}
-                        </label>
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <h2 className="text-2xl font-bold text-slate-800 mb-2">Train your AI</h2>
+                        <p className="text-slate-500 mb-8">Upload documents to expand your bot's knowledge base. It will use this context to answer customer queries.</p>
 
-                        {file && (
-                            <div style={{ margin: '16px 0', fontSize: '14px', color: '#334155' }}>
-                                <strong>Selected:</strong> {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                            </div>
-                        )}
-
-                        <div>
-                            <button onClick={handleUpload} disabled={!file || isUploading} style={{ backgroundColor: !file || isUploading ? '#94a3b8' : '#10b981', color: 'white', border: 'none', padding: '10px 24px', borderRadius: '6px', fontSize: '16px', fontWeight: 600, cursor: !file || isUploading ? 'not-allowed' : 'pointer', opacity: isUploading ? 0.7 : 1, transition: 'background-color 0.2s' }}>
-                                {isUploading ? 'Processing Vectors...' : 'Train AI'}
-                            </button>
-                        </div>
-
-                        {uploadStatus && (
-                            <div style={{ marginTop: '24px', padding: '12px', borderRadius: '6px', backgroundColor: uploadStatus.type === 'success' ? '#d1fae5' : '#fee2e2', color: uploadStatus.type === 'success' ? '#065f46' : '#991b1b', border: `1px solid ${uploadStatus.type === 'success' ? '#34d399' : '#f87171'}` }}>
-                                {uploadStatus.type === 'success' ? '✅ ' : '❌ '}
-                                {uploadStatus.message}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* SETTINGS TAB */}
-                {activeTab === 'settings' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        <div>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px', color: '#334155' }}>Bot Name</label>
-                            <input type="text" value={botName} onChange={(e) => setBotName(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '16px', boxSizing: 'border-box', outlineColor: '#3b82f6' }} />
-                        </div>
-
-                        <div style={{ position: 'relative' }}>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px', color: '#334155' }}>Theme Color</label>
-
-                            {/* Color Picker Trigger */}
-                            <div
-                                onClick={() => setShowColorPicker(!showColorPicker)}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '12px',
-                                    cursor: 'pointer',
-                                    padding: '8px',
-                                    border: '1px solid #cbd5e1',
-                                    borderRadius: '6px',
-                                    width: 'fit-content',
-                                    backgroundColor: '#fff'
-                                }}
-                            >
-                                <div style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    backgroundColor: colorHex,
-                                    borderRadius: '4px',
-                                    border: '1px solid #e2e8f0',
-                                    boxShadow: 'inset 0 2px 4px 0 rgb(0 0 0 / 0.05)'
-                                }} />
-                                <span style={{ fontFamily: 'monospace', color: '#475569', fontWeight: 500, fontSize: '16px' }}>{colorHex.toUpperCase()}</span>
+                        <div className="border-2 border-dashed border-slate-300 bg-slate-50 rounded-xl p-10 flex flex-col items-center justify-center text-center transition-all hover:bg-slate-100 hover:border-blue-300">
+                            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                             </div>
 
-                            {/* Color Picker Popover */}
-                            {showColorPicker && (
-                                <div ref={colorPickerRef} style={{
-                                    position: 'absolute',
-                                    zIndex: 10,
-                                    marginTop: '8px',
-                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                                    borderRadius: '8px',
-                                    backgroundColor: '#fff',
-                                    border: '1px solid #e2e8f0',
-                                    padding: '12px'
-                                }}>
-                                    <HexColorPicker color={colorHex} onChange={setColorHex} />
+                            <h3 className="text-lg font-semibold text-slate-700 mb-1">Upload PDF Document</h3>
+                            <p className="text-sm text-slate-500 mb-6 max-w-sm">Drag and drop your file here, or click the button below to browse your computer.</p>
+
+                            <input type="file" accept="application/pdf" onChange={handleFileChange} ref={fileInputRef} className="hidden" id="file-upload" />
+                            <label htmlFor="file-upload" className="bg-white border border-slate-300 text-slate-700 px-6 py-2.5 rounded-lg font-medium cursor-pointer hover:bg-slate-50 transition-colors shadow-sm">
+                                {file ? 'Change File' : 'Browse Files'}
+                            </label>
+
+                            {file && (
+                                <div className="mt-6 flex items-center gap-3 bg-white px-4 py-3 rounded-lg border border-slate-200 shadow-sm w-full max-w-md">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                    <div className="flex-1 min-w-0 text-left">
+                                        <p className="text-sm font-semibold text-slate-700 truncate">{file.name}</p>
+                                        <p className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                    </div>
                                 </div>
                             )}
                         </div>
 
-                        <div>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px', color: '#334155' }}>Welcome Message</label>
-                            <input type="text" value={welcomeMessage} onChange={(e) => setWelcomeMessage(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '16px', boxSizing: 'border-box', outlineColor: '#3b82f6' }} />
-                        </div>
-
-                        <div>
-                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px', color: '#334155' }}>System Prompt (Personality & Rules)</label>
-                            <textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={6} placeholder="E.g., You are a helpful customer support agent for Acme Corp..." style={{ width: '100%', padding: '12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'inherit', outlineColor: '#3b82f6', resize: 'vertical' }} />
-                            <p style={{ fontSize: '13px', color: '#64748b', marginTop: '6px' }}>This instructs the AI how to behave and answer questions.</p>
-                        </div>
-
-                        <div style={{ marginTop: '8px' }}>
-                            <button onClick={handleSaveSettings} disabled={isSaving} style={{ backgroundColor: isSaving ? '#94a3b8' : '#3b82f6', color: 'white', border: 'none', padding: '12px 28px', borderRadius: '6px', fontSize: '16px', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', transition: 'background-color 0.2s', boxShadow: '0 4px 6px -1px rgb(59 130 246 / 0.3)' }}>
-                                {isSaving ? 'Saving...' : 'Save Settings'}
+                        <div className="mt-8 flex items-center justify-between border-t border-slate-100 pt-6">
+                            <div>
+                                {uploadStatus && (
+                                    <div className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg ${uploadStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                                        {uploadStatus.type === 'success' ? (
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                        ) : (
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                                        )}
+                                        {uploadStatus.message}
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                onClick={handleUpload}
+                                disabled={!file || isUploading}
+                                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold transition-all ${!file || isUploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg'}`}
+                            >
+                                {isUploading ? (
+                                    <>
+                                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                        Processing...
+                                    </>
+                                ) : 'Process Document'}
                             </button>
                         </div>
-
-                        {saveStatus && (
-                            <div style={{ marginTop: '8px', padding: '12px', borderRadius: '6px', backgroundColor: saveStatus.type === 'success' ? '#d1fae5' : '#fee2e2', color: saveStatus.type === 'success' ? '#065f46' : '#991b1b', border: `1px solid ${saveStatus.type === 'success' ? '#34d399' : '#f87171'}` }}>
-                                {saveStatus.type === 'success' ? '✅ ' : '❌ '}
-                                {saveStatus.message}
-                            </div>
-                        )}
                     </div>
                 )}
-            </div>
+
+                { }
+                {activeTab === 'settings' && (
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <h2 className="text-2xl font-bold text-slate-800 mb-2">Bot Appearance & Behavior</h2>
+                        <p className="text-slate-500 mb-8">Customize how your bot looks and talks to your customers on your website.</p>
+
+                        <div className="space-y-6 max-w-2xl">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Bot Name</label>
+                                <input
+                                    type="text"
+                                    value={botName}
+                                    onChange={(e) => setBotName(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800"
+                                    placeholder="e.g., Acme Support Agent"
+                                />
+                            </div>
+
+                            <div className="relative">
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Theme Color</label>
+                                <div
+                                    onClick={() => setShowColorPicker(!showColorPicker)}
+                                    className="flex items-center gap-3 cursor-pointer p-2 border border-slate-300 rounded-lg w-fit hover:bg-slate-50 transition-colors"
+                                >
+                                    <div
+                                        className="w-8 h-8 rounded-md border border-slate-200 shadow-inner"
+                                        style={{ backgroundColor: colorHex }}
+                                    />
+                                    <span className="font-mono text-sm font-medium text-slate-600 pr-2">{colorHex.toUpperCase()}</span>
+                                </div>
+
+                                {showColorPicker && (
+                                    <div ref={colorPickerRef} className="absolute z-10 mt-2 bg-white rounded-xl shadow-xl border border-slate-100 p-3">
+                                        <HexColorPicker color={colorHex} onChange={setColorHex} />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Welcome Message</label>
+                                <input
+                                    type="text"
+                                    value={welcomeMessage}
+                                    onChange={(e) => setWelcomeMessage(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800"
+                                    placeholder="What should the bot say first?"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">System Prompt (Instructions)</label>
+                                <textarea
+                                    value={systemPrompt}
+                                    onChange={(e) => setSystemPrompt(e.target.value)}
+                                    rows={5}
+                                    className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 resize-y"
+                                    placeholder="E.g., You are a helpful customer support agent. Be polite, concise, and only use the provided knowledge base."
+                                />
+                                <p className="text-xs text-slate-500 mt-2">These hidden instructions dictate the AI's personality and boundaries.</p>
+                            </div>
+
+                            <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
+                                <div>
+                                    {saveStatus && (
+                                        <div className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg ${saveStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                                            {saveStatus.type === 'success' ? '✅' : '❌'} {saveStatus.message}
+                                        </div>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={handleSaveSettings}
+                                    disabled={isSaving}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    {isSaving ? 'Saving...' : (
+                                        <>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                                            Save Settings
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </main>
         </div>
     );
 };
