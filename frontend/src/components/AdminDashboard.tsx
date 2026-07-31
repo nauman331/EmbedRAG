@@ -27,12 +27,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     const [conversations, setConversations] = useState<any[]>([]);
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
+    const fetchConversations = () => {
+        fetch(`http://localhost:5000/api/conversations/${botId}`)
+            .then(res => res.json())
+            .then(data => setConversations(data))
+            .catch(err => console.error("Failed to fetch conversations", err));
+    };
+
     useEffect(() => {
         if (activeTab === 'inbox') {
-            fetch(`http://localhost:5000/api/conversations/${botId}`)
-                .then(res => res.json())
-                .then(data => setConversations(data))
-                .catch(err => console.error("Failed to fetch conversations", err));
+            fetchConversations();
         }
     }, [activeTab, botId]);
 
@@ -377,9 +381,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-300">
                         {/* Left side: List of conversations */}
                         <div className="w-1/3 border-r border-slate-200 overflow-y-auto bg-slate-50 flex flex-col">
-                            <div className="p-4 border-b border-slate-200 bg-white sticky top-0 z-10 shadow-sm">
-                                <h3 className="font-bold text-slate-800">Chat History</h3>
-                                <p className="text-xs text-slate-500 mt-1">Live customer conversations</p>
+                            <div className="p-4 border-b border-slate-200 bg-white sticky top-0 z-10 shadow-sm flex justify-between items-center">
+                                <div>
+                                    <h3 className="font-bold text-slate-800">Chat History</h3>
+                                    <p className="text-xs text-slate-500 mt-1">Live customer conversations</p>
+                                </div>
+                                <button
+                                    onClick={fetchConversations}
+                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Refresh Inbox"
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                                </button>
                             </div>
 
                             <div className="flex-1 overflow-y-auto">

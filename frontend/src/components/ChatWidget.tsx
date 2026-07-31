@@ -27,7 +27,14 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
 
-    const [sessionId] = useState(() => 'sess_' + Math.random().toString(36).substring(2, 15));
+    const [sessionId] = useState(() => {
+        const storedId = localStorage.getItem('embedai_session_id');
+        if (storedId) return storedId;
+
+        const newId = 'sess_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('embedai_session_id', newId);
+        return newId;
+    });
 
     const socketRef = useRef<Socket | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);

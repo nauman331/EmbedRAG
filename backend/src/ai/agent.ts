@@ -92,9 +92,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
         return stream;
 
     } catch (error: any) {
-        console.error("🚨 GEMINI ERROR DETAILS:", error);
-
-        if (error?.status === 401 || error?.status === 429 || error?.message?.includes('API key')) {
+        if (error?.status === 401 || error?.status === 429 || error?.message?.includes('API key') || error?.message?.includes('404')) {
             throw new Error(`🔒 Authentication or Quota failed with ${bot.llmProvider}. Please check your API key in the dashboard.`);
         }
         throw error;

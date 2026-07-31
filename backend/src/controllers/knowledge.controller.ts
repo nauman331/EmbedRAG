@@ -50,10 +50,11 @@ export const uploadKnowledge = async (req: Request, res: Response): Promise<any>
 
         const embeddings = new GoogleGenerativeAIEmbeddings({
             apiKey: tenant.apiKeys.gemini,
-            modelName: 'gemini-embedding-001',
+            model: 'text-embedding-004',
         });
 
         const textsToEmbed = docs.map(doc => doc.pageContent);
+
         const vectorArrays = await embeddings.embedDocuments(textsToEmbed);
 
         const chunkDocs = docs.map((doc, index) => ({
@@ -63,6 +64,8 @@ export const uploadKnowledge = async (req: Request, res: Response): Promise<any>
             text: doc.pageContent,
             embedding: vectorArrays[index]
         }));
+
+        await DocumentChunk.deleteMany({ botId: new mongoose.Types.ObjectId(botId) });
 
         await DocumentChunk.insertMany(chunkDocs);
 

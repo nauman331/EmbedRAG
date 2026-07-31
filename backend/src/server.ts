@@ -9,6 +9,7 @@ import knowledgeRoutes from './routes/knowledge.route';
 import botRoutes from './routes/bot.route';
 import { generateBotResponse } from './ai/agent.js';
 import Conversation from "./models/conversation.model"
+import mongoose from 'mongoose';
 
 const app = express();
 
@@ -48,23 +49,31 @@ io.on('connection', (socket: Socket) => {
         console.log(`💬 Received message for Bot ${data.botId}: "${data.message}"`);
         try {
             const stream = await generateBotResponse(data.botId, data.message, data.history);
+
             let fullBotResponse = '';
+
             for await (const chunk of stream) {
                 fullBotResponse += chunk;
                 socket.emit('bot_response_chunk', { chunk });
             }
+
+            const botObjectId = new mongoose.Types.ObjectId(data.botId);
+
             await Conversation.findOneAndUpdate(
-                { botId: data.botId, sessionId: data.sessionId },
+                { botId: botObjectId, sessionId: data.sessionId },
                 {
                     $push: {
-                        messages: [
-                            { role: 'user', content: data.message, createdAt: new Date() },
-                            { role: 'bot', content: fullBotResponse, createdAt: new Date() }
-                        ]
+                        messages: {
+                            $each: [
+                                { role: 'user', content: data.message, createdAt: new Date() },
+                                { role: 'bot', content: fullBotResponse, createdAt: new Date() }
+                            ]
+                        }
                     }
                 },
                 { upsert: true, new: true }
             );
+
             socket.emit('bot_response_done');
 
         } catch (error: any) {
@@ -83,6 +92,26 @@ io.on('connection', (socket: Socket) => {
 app.get('/api/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', message: 'Screened SaaS Backend is running.' });
 });
+
+interface ConversationParams {
+    botId: string;
+}
+
+app.get(
+    '/api/conversations/:botId',
+    async (
+        req: Request<ConversationParams>,
+        res: Response
+    ): Promise<any> => {
+        const botObjectId = new mongoose.Types.ObjectId(req.params.botId);
+
+        const conversations = await Conversation.find({
+            botId: botObjectId
+        }).sort({ updatedAt: -1 });
+
+        return res.json(conversations);
+    }
+);
 
 
 server.listen(port, () => {
