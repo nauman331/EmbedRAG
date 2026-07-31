@@ -113,7 +113,6 @@ app.get(
     }
 );
 
-
 server.listen(port, () => {
     console.log(`[Server]: Backend is running at http://localhost:${port}`);
     console.log(`[WebSockets]: Socket.io is actively listening for connections.`);
