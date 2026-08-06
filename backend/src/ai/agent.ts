@@ -1,5 +1,7 @@
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 import { ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
+import { ChatOpenAI } from '@langchain/openai';
+import { ChatAnthropic } from '@langchain/anthropic';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
@@ -15,7 +17,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
     const tenant = await Tenant.findById(bot.tenantId);
     if (!tenant) throw new Error('Tenant not found.');
 
-    const geminiKey = tenant.apiKeys?.gemini || '';
+    const geminiKey = tenant.apiKeys?.gemini || process.env.GEMINI_API_KEY || '';
 
     if (!geminiKey || geminiKey.includes('put_your') || geminiKey.trim() === '') {
         throw new Error('⚠️ Please add a valid Gemini API Key in your dashboard for vector embeddings.');
@@ -23,8 +25,8 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
 
     let llmKey = '';
     if (bot.llmProvider === 'GEMINI') llmKey = geminiKey;
-    else if (bot.llmProvider === 'OPENAI') llmKey = tenant.apiKeys?.openai || '';
-    else if (bot.llmProvider === 'ANTHROPIC') llmKey = tenant.apiKeys?.anthropic || '';
+    else if (bot.llmProvider === 'OPENAI') llmKey = tenant.apiKeys?.openai || process.env.OPENAI_API_KEY || '';
+    else if (bot.llmProvider === 'ANTHROPIC') llmKey = tenant.apiKeys?.anthropic || process.env.ANTHROPIC_API_KEY || '';
 
     if (!llmKey || llmKey.includes('put_your') || llmKey.trim() === '') {
         throw new Error(`⚠️ Please add a valid ${bot.llmProvider} API Key in your dashboard to activate the chat model.`);
@@ -33,7 +35,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
     try {
         const embeddings = new GoogleGenerativeAIEmbeddings({
             apiKey: geminiKey,
-            model: process.env.EMBEDDING_MODEL,
+            model: process.env.EMBEDDING_MODEL || 'text-embedding-004',
         });
 
         if (!mongoose.connection.db) {
@@ -87,11 +89,30 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
             }
         );
 
-        const llm = new ChatGoogleGenerativeAI({
-            apiKey: llmKey,
-            model: bot.llmModel || process.env.CHAT_MODEL!,
-            temperature: 0.2,
-        });
+        let llm;
+        const temperature = 0.2;
+
+        if (bot.llmProvider === 'OPENAI') {
+            llm = new ChatOpenAI({
+                apiKey: llmKey,
+                modelName: bot.llmModel || process.env.OPENAI_API_MODEL!,
+                temperature,
+                streaming: true
+            });
+        } else if (bot.llmProvider === 'ANTHROPIC') {
+            llm = new ChatAnthropic({
+                apiKey: llmKey,
+                modelName: bot.llmModel || process.env.CLAUDE_MODEL!,
+                temperature,
+                streaming: true
+            });
+        } else {
+            llm = new ChatGoogleGenerativeAI({
+                apiKey: llmKey,
+                model: bot.llmModel || process.env.GEMINI_MODEL!,
+                temperature,
+            });
+        }
 
         const agent = createReactAgent({
             llm: llm,
@@ -115,8 +136,19 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
 
         async function* generateTextChunks() {
             for await (const event of eventStream) {
-                if (event.event === "on_chat_model_stream" && event.data.chunk.content) {
-                    yield event.data.chunk.content;
+                // Anthropic sometimes streams content slightly differently in LangChain, so we safely fall back to checking text
+                const chunkContent = event?.data?.chunk?.content || event?.data?.chunk?.text;
+                if (event.event === "on_chat_model_stream" && chunkContent) {
+                    // Check if it's an array (Anthropic) or string
+                    if (Array.isArray(chunkContent)) {
+                        for (const block of chunkContent) {
+                            if (block.type === 'text') {
+                                yield block.text;
+                            }
+                        }
+                    } else if (typeof chunkContent === 'string') {
+                        yield chunkContent;
+                    }
                 }
             }
         }
@@ -124,7 +156,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
         return generateTextChunks();
 
     } catch (error: any) {
-        console.error("🚨 GEMINI ERROR DETAILS:", error);
+        console.error(`🚨 ${bot.llmProvider} ERROR DETAILS:`, error);
         if (error?.status === 401 || error?.status === 429 || error?.message?.includes('API key') || error?.message?.includes('404')) {
             throw new Error(`🔒 Authentication or Quota failed with ${bot.llmProvider}. Please check your API key in the dashboard.`);
         }

@@ -7,7 +7,7 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId }) => {
-    const [activeTab, setActiveTab] = useState<'knowledge' | 'settings' | 'install' | 'inbox'>('knowledge');
+    const [activeTab, setActiveTab] = useState<'knowledge' | 'settings' | 'install' | 'inbox'>('settings'); // Default to settings for testing
 
     const [file, setFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -18,6 +18,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     const [systemPrompt, setSystemPrompt] = useState('');
     const [welcomeMessage, setWelcomeMessage] = useState('');
     const [colorHex, setColorHex] = useState('#000000');
+
+    const [llmProvider, setLlmProvider] = useState<'GEMINI' | 'OPENAI' | 'ANTHROPIC'>('GEMINI');
+    const [llmModel, setLlmModel] = useState('gemini-3.6-flash');
+    const [apiKeys, setApiKeys] = useState({
+        openai: '',
+        anthropic: '',
+        gemini: ''
+    });
+
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
@@ -51,6 +60,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                     setSystemPrompt(data.systemPrompt || '');
                     setWelcomeMessage(data.welcomeMessage || '');
                     setColorHex(data.colorHex || '#000000');
+
+                    if (data.llmProvider) setLlmProvider(data.llmProvider);
+                    if (data.llmModel) setLlmModel(data.llmModel);
+                    if (data.apiKeys) setApiKeys(data.apiKeys);
                 }
             } catch (error) {
                 console.error("Failed to fetch bot config:", error);
@@ -128,7 +141,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                     name: botName,
                     systemPrompt,
                     welcomeMessage,
-                    colorHex
+                    colorHex,
+                    llmProvider,
+                    llmModel,
+                    apiKeys
                 })
             });
 
@@ -143,6 +159,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const getAvailableModels = () => {
+        switch (llmProvider) {
+            case 'GEMINI':
+                return ['gemini-3.6-flash', 'gemini-3.1-pro', 'gemini-1.5-flash'];
+            case 'OPENAI':
+                return ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
+            case 'ANTHROPIC':
+                return ['claude-3-haiku-20240307', 'claude-3-sonnet-20240229', 'claude-3-opus-20240229'];
+            default:
+                return [];
+        }
+    };
+
+    const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newProvider = e.target.value as 'GEMINI' | 'OPENAI' | 'ANTHROPIC';
+        setLlmProvider(newProvider);
+
+        if (newProvider === 'GEMINI') setLlmModel('gemini-3.6-flash');
+        if (newProvider === 'OPENAI') setLlmModel('gpt-4o-mini');
+        if (newProvider === 'ANTHROPIC') setLlmModel('claude-3-haiku-20240307');
     };
 
     return (
@@ -249,66 +287,132 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
 
                 { }
                 {activeTab === 'settings' && (
-                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                        <h2 className="text-2xl font-bold text-slate-800 mb-2">Bot Appearance & Behavior</h2>
-                        <p className="text-slate-500 mb-8">Customize how your bot looks and talks to your customers on your website.</p>
+                    <div className="space-y-6">
+                        {/* Box 1: Appearance */}
+                        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <h2 className="text-2xl font-bold text-slate-800 mb-2">Bot Appearance & Behavior</h2>
+                            <p className="text-slate-500 mb-8">Customize how your bot looks and talks to your customers on your website.</p>
 
-                        <div className="space-y-6 max-w-2xl">
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Bot Name</label>
-                                <input
-                                    type="text"
-                                    value={botName}
-                                    onChange={(e) => setBotName(e.target.value)}
-                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800"
-                                    placeholder="e.g., Acme Support Agent"
-                                />
-                            </div>
-
-                            <div className="relative">
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Theme Color</label>
-                                <div
-                                    onClick={() => setShowColorPicker(!showColorPicker)}
-                                    className="flex items-center gap-3 cursor-pointer p-2 border border-slate-300 rounded-lg w-fit hover:bg-slate-50 transition-colors"
-                                >
-                                    <div
-                                        className="w-8 h-8 rounded-md border border-slate-200 shadow-inner"
-                                        style={{ backgroundColor: colorHex }}
+                            <div className="space-y-6 max-w-2xl">
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Bot Name</label>
+                                    <input
+                                        type="text"
+                                        value={botName}
+                                        onChange={(e) => setBotName(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800"
+                                        placeholder="e.g., Acme Support Agent"
                                     />
-                                    <span className="font-mono text-sm font-medium text-slate-600 pr-2">{colorHex.toUpperCase()}</span>
                                 </div>
 
-                                {showColorPicker && (
-                                    <div ref={colorPickerRef} className="absolute z-10 mt-2 bg-white rounded-xl shadow-xl border border-slate-100 p-3">
-                                        <HexColorPicker color={colorHex} onChange={setColorHex} />
+                                <div className="relative">
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Theme Color</label>
+                                    <div
+                                        onClick={() => setShowColorPicker(!showColorPicker)}
+                                        className="flex items-center gap-3 cursor-pointer p-2 border border-slate-300 rounded-lg w-fit hover:bg-slate-50 transition-colors"
+                                    >
+                                        <div
+                                            className="w-8 h-8 rounded-md border border-slate-200 shadow-inner"
+                                            style={{ backgroundColor: colorHex }}
+                                        />
+                                        <span className="font-mono text-sm font-medium text-slate-600 pr-2">{colorHex.toUpperCase()}</span>
                                     </div>
-                                )}
+
+                                    {showColorPicker && (
+                                        <div ref={colorPickerRef} className="absolute z-10 mt-2 bg-white rounded-xl shadow-xl border border-slate-100 p-3">
+                                            <HexColorPicker color={colorHex} onChange={setColorHex} />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Welcome Message</label>
+                                    <input
+                                        type="text"
+                                        value={welcomeMessage}
+                                        onChange={(e) => setWelcomeMessage(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800"
+                                        placeholder="What should the bot say first?"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">System Prompt (Instructions)</label>
+                                    <textarea
+                                        value={systemPrompt}
+                                        onChange={(e) => setSystemPrompt(e.target.value)}
+                                        rows={5}
+                                        className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 resize-y"
+                                        placeholder="E.g., You are a helpful customer support agent. Be polite, concise, and only use the provided knowledge base."
+                                    />
+                                    <p className="text-xs text-slate-500 mt-2">These hidden instructions dictate the AI's personality and boundaries.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Box 2: AI Configuration */}
+                        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <div className="flex items-center gap-3 mb-2">
+                                <h2 className="text-2xl font-bold text-slate-800">AI Configuration</h2>
+                                <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide">Advanced</span>
+                            </div>
+                            <p className="text-slate-500 mb-8">Select the language model that powers your agent and provide the necessary API keys.</p>
+
+                            <div className="space-y-6 max-w-2xl">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">LLM Provider</label>
+                                        <select
+                                            value={llmProvider}
+                                            onChange={handleProviderChange}
+                                            className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 bg-white"
+                                        >
+                                            <option value="GEMINI">Google Gemini</option>
+                                            <option value="OPENAI">OpenAI</option>
+                                            <option value="ANTHROPIC">Anthropic Claude</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Model Version</label>
+                                        <select
+                                            value={llmModel}
+                                            onChange={(e) => setLlmModel(e.target.value)}
+                                            className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 bg-white"
+                                        >
+                                            {getAvailableModels().map(model => (
+                                                <option key={model} value={model}>{model}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                        {llmProvider === 'GEMINI' ? 'Google AI Studio Key' :
+                                            llmProvider === 'OPENAI' ? 'OpenAI API Key' :
+                                                'Anthropic API Key'}
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={
+                                            llmProvider === 'GEMINI' ? apiKeys.gemini :
+                                                llmProvider === 'OPENAI' ? apiKeys.openai :
+                                                    apiKeys.anthropic
+                                        }
+                                        onChange={(e) => setApiKeys({
+                                            ...apiKeys,
+                                            [llmProvider.toLowerCase()]: e.target.value
+                                        })}
+                                        className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 font-mono text-sm"
+                                        placeholder="sk-..."
+                                    />
+                                    <p className="text-xs text-slate-500 mt-2">
+                                        Keys are stored securely. Note: Gemini is required for vector embeddings, regardless of the chat provider selected.
+                                    </p>
+                                </div>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Welcome Message</label>
-                                <input
-                                    type="text"
-                                    value={welcomeMessage}
-                                    onChange={(e) => setWelcomeMessage(e.target.value)}
-                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800"
-                                    placeholder="What should the bot say first?"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">System Prompt (Instructions)</label>
-                                <textarea
-                                    value={systemPrompt}
-                                    onChange={(e) => setSystemPrompt(e.target.value)}
-                                    rows={5}
-                                    className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 resize-y"
-                                    placeholder="E.g., You are a helpful customer support agent. Be polite, concise, and only use the provided knowledge base."
-                                />
-                                <p className="text-xs text-slate-500 mt-2">These hidden instructions dictate the AI's personality and boundaries.</p>
-                            </div>
-
-                            <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
+                            <div className="pt-8 mt-8 border-t border-slate-100 flex items-center justify-between">
                                 <div>
                                     {saveStatus && (
                                         <div className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg ${saveStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
