@@ -10,8 +10,11 @@ import botRoutes from './routes/bot.route';
 import { generateBotResponse } from './ai/agent.js';
 import Conversation from "./models/conversation.model"
 import mongoose from 'mongoose';
+import cookieParser from 'cookie-parser';
+import authRoutes from './routes/auth.route';
 
 const app = express();
+app.use(cookieParser());
 
 connectDB();
 
@@ -31,6 +34,7 @@ app.use(cors({
 
 app.use(express.json());
 
+app.use('/api/auth', authRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/bots', botRoutes);
 
