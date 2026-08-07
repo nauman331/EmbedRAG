@@ -5,8 +5,8 @@ import User from '../models/user.modal';
 import Tenant from '../models/tenant.model';
 import RefreshToken from '../models/refreshtoken.model';
 
-const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET!;
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!;
+const getAccessSecret = () => process.env.JWT_ACCESS_SECRET!;
+const getRefreshSecret = () => process.env.JWT_REFRESH_SECRET!;
 
 const setRefreshTokenCookie = (res: Response, token: string) => {
     res.cookie('jwt_refresh', token, {
@@ -54,13 +54,13 @@ export const login = async (req: Request, res: Response): Promise<any> => {
 
         const accessToken = jwt.sign(
             { userId: user._id, tenantId: user.tenantId },
-            ACCESS_SECRET,
+            getAccessSecret(),
             { expiresIn: '15m' }
         );
 
         const refreshToken = jwt.sign(
             { userId: user._id },
-            REFRESH_SECRET,
+            getRefreshSecret(),
             { expiresIn: '7d' }
         );
 
@@ -95,19 +95,21 @@ export const refreshTokens = async (req: Request, res: Response): Promise<any> =
 
     try {
         const foundToken = await RefreshToken.findOne({ token: currentRefreshToken });
+
         if (!foundToken || foundToken.revoked) {
 
             try {
-                const decoded: any = jwt.verify(currentRefreshToken, REFRESH_SECRET);
+                const decoded: any = jwt.verify(currentRefreshToken, getRefreshSecret());
                 console.warn(`🚨 BREACH DETECTED for User ${decoded.userId}. Revoking ALL tokens.`);
+
                 await RefreshToken.deleteMany({ userId: decoded.userId });
             } catch (err) {
-                console.warn('🚨 Invalid refresh token detected. No user ID could be extracted.');
+                console.warn('🚨 Invalid refresh token detected. No user context available for revocation.');
             }
             return res.status(403).json({ error: 'Security breach detected. Please log in again.' });
         }
 
-        const decoded: any = jwt.verify(currentRefreshToken, REFRESH_SECRET);
+        const decoded: any = jwt.verify(currentRefreshToken, getRefreshSecret());
         const user = await User.findById(decoded.userId);
         if (!user) return res.status(401).json({ error: 'User not found.' });
 
@@ -116,13 +118,13 @@ export const refreshTokens = async (req: Request, res: Response): Promise<any> =
 
         const newAccessToken = jwt.sign(
             { userId: user._id, tenantId: user.tenantId },
-            ACCESS_SECRET,
+            getAccessSecret(),
             { expiresIn: '15m' }
         );
 
         const newRefreshToken = jwt.sign(
             { userId: user._id },
-            REFRESH_SECRET,
+            getRefreshSecret(),
             { expiresIn: '7d' }
         );
 
@@ -148,7 +150,6 @@ export const logout = async (req: Request, res: Response): Promise<any> => {
     const refreshToken = cookies.jwt_refresh;
 
     await RefreshToken.findOneAndDelete({ token: refreshToken });
-
 
     res.clearCookie('jwt_refresh', { httpOnly: true, secure: true, sameSite: 'strict' });
 

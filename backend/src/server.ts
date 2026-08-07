@@ -94,7 +94,7 @@ io.on('connection', (socket: Socket) => {
 });
 
 app.get('/api/health', (req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', message: 'Screened SaaS Backend is running.' });
+    res.status(200).json({ status: 'ok', message: 'Embed RAG Backend is running.' });
 });
 
 interface ConversationParams {
