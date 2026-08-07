@@ -9,6 +9,7 @@ import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages
 import mongoose from 'mongoose';
 import Bot from '../models/bot.model';
 import Tenant from '../models/tenant.model';
+import SemanticCache from '../models/semanticcache.model';
 
 export const generateBotResponse = async (botId: string, userMessage: string, history: any[] = []) => {
     const bot = await Bot.findById(botId);
@@ -18,7 +19,6 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
     if (!tenant) throw new Error('Tenant not found.');
 
     const geminiKey = tenant.apiKeys?.gemini || process.env.GEMINI_API_KEY || '';
-
     if (!geminiKey || geminiKey.includes('put_your') || geminiKey.trim() === '') {
         throw new Error('⚠️ Please add a valid Gemini API Key in your dashboard for vector embeddings.');
     }
@@ -28,20 +28,46 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
     else if (bot.llmProvider === 'OPENAI') llmKey = tenant.apiKeys?.openai || process.env.OPENAI_API_KEY || '';
     else if (bot.llmProvider === 'ANTHROPIC') llmKey = tenant.apiKeys?.anthropic || process.env.ANTHROPIC_API_KEY || '';
 
-    if (!llmKey || llmKey.includes('put_your') || llmKey.trim() === '') {
-        throw new Error(`⚠️ Please add a valid ${bot.llmProvider} API Key in your dashboard to activate the chat model.`);
-    }
-
     try {
         const embeddings = new GoogleGenerativeAIEmbeddings({
             apiKey: geminiKey,
             model: process.env.EMBEDDING_MODEL || 'text-embedding-004',
         });
 
-        if (!mongoose.connection.db) {
-            throw new Error('MongoDB database connection is not established yet.');
+        console.log(`\n🔍 Checking Semantic Cache for: "${userMessage}"...`);
+        const questionEmbedding = await embeddings.embedQuery(userMessage);
+
+        const cachedResults = await SemanticCache.aggregate([
+            {
+                $vectorSearch: {
+                    index: 'cache_vector_index',
+                    path: 'embedding',
+                    queryVector: questionEmbedding,
+                    numCandidates: 10,
+                    limit: 1,
+                    filter: { botId: new mongoose.Types.ObjectId(botId) }
+                }
+            },
+            {
+                $project: {
+                    answer: 1,
+                    score: { $meta: "vectorSearchScore" }
+                }
+            }
+        ]);
+
+        if (cachedResults.length > 0 && cachedResults[0].score > 0.95) {
+            console.log(`⚡ CACHE HIT! (Score: ${cachedResults[0].score}). Saving LLM costs.`);
+
+            async function* generateCachedChunks() {
+                yield "⚡ " + cachedResults[0].answer;
+            }
+            return generateCachedChunks();
         }
 
+        console.log(`🐢 CACHE MISS. Booting up LangGraph Agent...`);
+
+        if (!mongoose.connection.db) throw new Error('MongoDB database connection is not established yet.');
         const collection = mongoose.connection.db.collection('documentchunks');
 
         const vectorStore = new MongoDBAtlasVectorSearch(embeddings, {
@@ -51,12 +77,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
             embeddingKey: 'embedding',
         });
 
-        const retriever = vectorStore.asRetriever({
-            k: 4,
-            filter: {
-                botId: new mongoose.Types.ObjectId(botId),
-            },
-        });
+        const retriever = vectorStore.asRetriever({ k: 4, filter: { botId: new mongoose.Types.ObjectId(botId) } });
 
         const searchKnowledgeBaseTool = tool(
             async ({ query }) => {
@@ -67,10 +88,8 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
             },
             {
                 name: 'search_knowledge_base',
-                description: 'Use this tool to search the company knowledge base, PDFs, and uploaded documents for facts, policies, and product details.',
-                schema: z.object({
-                    query: z.string().describe("The specific question or keywords to search for.")
-                })
+                description: 'Search the company knowledge base for facts, policies, and product details.',
+                schema: z.object({ query: z.string() })
             }
         );
 
@@ -81,11 +100,8 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
             },
             {
                 name: 'capture_lead',
-                description: 'Use this tool when a user is frustrated, wants to speak to a human, or asks to be contacted. Ask them for their name and email first before calling this.',
-                schema: z.object({
-                    name: z.string().describe("The user's name"),
-                    email: z.string().email().describe("The user's email address")
-                })
+                description: 'Use this tool when a user is frustrated, wants to speak to a human, or asks to be contacted.',
+                schema: z.object({ name: z.string(), email: z.string().email() })
             }
         );
 
@@ -93,25 +109,11 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
         const temperature = 0.2;
 
         if (bot.llmProvider === 'OPENAI') {
-            llm = new ChatOpenAI({
-                apiKey: llmKey,
-                modelName: bot.llmModel || process.env.OPENAI_API_MODEL!,
-                temperature,
-                streaming: true
-            });
+            llm = new ChatOpenAI({ apiKey: llmKey, modelName: bot.llmModel || 'gpt-4o-mini', temperature, streaming: true });
         } else if (bot.llmProvider === 'ANTHROPIC') {
-            llm = new ChatAnthropic({
-                apiKey: llmKey,
-                modelName: bot.llmModel || process.env.CLAUDE_MODEL!,
-                temperature,
-                streaming: true
-            });
+            llm = new ChatAnthropic({ apiKey: llmKey, modelName: bot.llmModel || 'claude-3-haiku-20240307', temperature, streaming: true });
         } else {
-            llm = new ChatGoogleGenerativeAI({
-                apiKey: llmKey,
-                model: bot.llmModel || process.env.GEMINI_MODEL!,
-                temperature,
-            });
+            llm = new ChatGoogleGenerativeAI({ apiKey: llmKey, model: bot.llmModel || process.env.CHAT_MODEL || 'gemini-3.6-flash', temperature });
         }
 
         const agent = createReactAgent({
@@ -124,42 +126,47 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
         );
 
         const finalMessages = [
-            new SystemMessage(`${bot.systemPrompt}\n\nYou have tools available. Only use 'search_knowledge_base' if you need factual data from the context. If you don't need context to answer naturally (like saying hello), do not use the tool.`),
+            new SystemMessage(`${bot.systemPrompt}\n\nYou have tools available. Only use 'search_knowledge_base' if you need factual data from the context.`),
             ...formattedMessages,
             new HumanMessage(userMessage)
         ];
 
-        const eventStream = await agent.streamEvents(
-            { messages: finalMessages },
-            { version: "v2" }
-        );
+        const eventStream = await agent.streamEvents({ messages: finalMessages }, { version: "v2" });
 
         async function* generateTextChunks() {
+            let fullAgentResponse = '';
             for await (const event of eventStream) {
-                // Anthropic sometimes streams content slightly differently in LangChain, so we safely fall back to checking text
                 const chunkContent = event?.data?.chunk?.content || event?.data?.chunk?.text;
                 if (event.event === "on_chat_model_stream" && chunkContent) {
-                    // Check if it's an array (Anthropic) or string
                     if (Array.isArray(chunkContent)) {
                         for (const block of chunkContent) {
                             if (block.type === 'text') {
+                                fullAgentResponse += block.text;
                                 yield block.text;
                             }
                         }
                     } else if (typeof chunkContent === 'string') {
+                        fullAgentResponse += chunkContent;
                         yield chunkContent;
                     }
                 }
+            }
+
+            if (fullAgentResponse.trim() !== '') {
+                console.log(`💾 Saving response to Semantic Cache...`);
+                await SemanticCache.create({
+                    botId: new mongoose.Types.ObjectId(botId),
+                    question: userMessage,
+                    answer: fullAgentResponse,
+                    embedding: questionEmbedding
+                });
             }
         }
 
         return generateTextChunks();
 
     } catch (error: any) {
-        console.error(`🚨 ${bot.llmProvider} ERROR DETAILS:`, error);
-        if (error?.status === 401 || error?.status === 429 || error?.message?.includes('API key') || error?.message?.includes('404')) {
-            throw new Error(`🔒 Authentication or Quota failed with ${bot.llmProvider}. Please check your API key in the dashboard.`);
-        }
+        console.error(`🚨 ERROR DETAILS:`, error);
         throw error;
     }
 };
