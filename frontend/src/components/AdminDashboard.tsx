@@ -8,7 +8,7 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId }) => {
-    const [activeTab, setActiveTab] = useState<'knowledge' | 'settings' | 'install' | 'inbox' | 'analytics'>('settings');
+    const [activeTab, setActiveTab] = useState<'knowledge' | 'settings' | 'install' | 'inbox' | 'analytics' | 'leads'>('settings');
 
     const [file, setFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -42,6 +42,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     const [isLoadingSources, setIsLoadingSources] = useState(false);
 
     const [analyticsData, setAnalyticsData] = useState<any>(null);
+    const [leads, setLeads] = useState<any[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const fetchConversations = () => {
@@ -55,7 +56,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
         let interval: any;
         if (activeTab === 'inbox') {
             fetchConversations();
-            // Live Polling: Check for new customer messages every 3 seconds
             interval = setInterval(fetchConversations, 3000);
         } else if (activeTab === 'analytics') {
             fetch(`http://localhost:5000/api/bots/${botId}/analytics`)
@@ -64,12 +64,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                 .catch(err => console.error("Failed to fetch analytics", err));
         } else if (activeTab === 'knowledge') {
             fetchKnowledgeSources();
+        } else if (activeTab === 'leads') {
+            fetch(`http://localhost:5000/api/leads/${botId}`)
+                .then(res => res.json())
+                .then(data => setLeads(data))
+                .catch(err => console.error("Failed to fetch leads", err));
         }
 
         return () => { if (interval) clearInterval(interval); }
     }, [activeTab, botId]);
 
-    // Scroll to bottom when new messages arrive in the inbox
     useEffect(() => {
         if (activeTab === 'inbox' && messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -226,7 +230,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     const handleTakeOver = async (sessionId: string) => {
         try {
             await fetch(`http://localhost:5000/api/conversations/${sessionId}/takeover`, { method: 'POST' });
-            fetchConversations(); // Instantly refresh
+            fetchConversations();
         } catch (error) {
             console.error("Failed to take over chat", error);
         }
@@ -235,9 +239,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     const handleAdminReply = async () => {
         if (!adminMessage.trim() || !selectedSessionId) return;
         const msg = adminMessage;
-        setAdminMessage(''); // clear input instantly for UX
+        setAdminMessage('');
 
-        // Optimistically update UI
         setConversations(prev => prev.map(c =>
             c.sessionId === selectedSessionId
                 ? { ...c, messages: [...c.messages, { role: 'admin', content: msg, createdAt: new Date() }] }
@@ -254,6 +257,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
         } catch (error) {
             console.error("Failed to send reply", error);
         }
+    };
+
+    const exportLeadsToCSV = () => {
+        if (leads.length === 0) return;
+        const headers = ['Name', 'Email', 'Status', 'Date Captured'];
+        const csvContent = [
+            headers.join(','),
+            ...leads.map(lead => [
+                `"${lead.name}"`,
+                `"${lead.email}"`,
+                lead.status,
+                new Date(lead.createdAt).toLocaleDateString()
+            ].join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'embedai_leads.csv';
+        link.click();
     };
 
     return (
@@ -295,9 +318,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
                         Analytics
                     </button>
+                    <button
+                        onClick={() => setActiveTab('leads')}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'leads' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        Captured Leads
+                    </button>
                 </div>
             </aside>
 
+            { }
             <main className="flex-1 min-w-0">
                 {activeTab === 'knowledge' && (
                     <div className="space-y-6">
@@ -393,6 +424,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                     </div>
                 )}
 
+                { }
                 {activeTab === 'settings' && (
                     <div className="space-y-6">
                         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -474,6 +506,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                     </div>
                 )}
 
+                { }
                 {activeTab === 'install' && (
                     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <h2 className="text-2xl font-bold text-slate-800 mb-2">Install Your Bot</h2>
@@ -496,6 +529,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                     </div>
                 )}
 
+                { }
                 {activeTab === 'inbox' && (
                     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <div className="w-1/3 border-r border-slate-200 overflow-y-auto bg-slate-50 flex flex-col">
@@ -584,6 +618,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                     </div>
                 )}
 
+                { }
                 {activeTab === 'analytics' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <div>
@@ -650,6 +685,69 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                     <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded-xl text-slate-400 text-sm">Loading chart data...</div>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                { }
+                {activeTab === 'leads' && (
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">Captured Leads</h3>
+                                <p className="text-sm text-slate-500 mt-1">Contacts collected automatically by your AI agent.</p>
+                            </div>
+                            <button
+                                onClick={exportLeadsToCSV}
+                                disabled={leads.length === 0}
+                                className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                Export CSV
+                            </button>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm text-slate-600">
+                                <thead className="bg-white text-slate-500 text-xs uppercase font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-6 py-4">Name</th>
+                                        <th className="px-6 py-4">Email</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4 text-right">Date Captured</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 bg-white">
+                                    {leads.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-12 text-center">
+                                                <div className="flex flex-col items-center justify-center text-slate-500">
+                                                    <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                                                    <p className="font-medium">No leads captured yet.</p>
+                                                    <p className="text-xs mt-1">When a user asks to speak to a human, the AI will collect their info here.</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        leads.map((lead) => (
+                                            <tr key={lead._id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4 font-semibold text-slate-800">{lead.name}</td>
+                                                <td className="px-6 py-4">
+                                                    <a href={`mailto:${lead.email}`} className="text-blue-600 hover:underline">{lead.email}</a>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide">
+                                                        {lead.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right text-slate-500">
+                                                    {new Date(lead.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 )}

@@ -13,6 +13,7 @@ import mongoose from 'mongoose';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.route';
 import conversationRoutes from './routes/conversation.route';
+import leadRoutes from './routes/lead.routes';
 
 const app = express();
 app.use(cookieParser());
@@ -39,6 +40,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/bots', botRoutes);
 app.use('/api/conversations', conversationRoutes);
+app.use('/api/leads', leadRoutes);
 
 const io = new Server(server, {
     cors: {
@@ -47,6 +49,7 @@ const io = new Server(server, {
         credentials: true
     }
 });
+
 
 app.set('io', io);
 
@@ -75,11 +78,21 @@ io.on('connection', (socket: Socket) => {
             convo.messages.push({ role: 'user', content: message, createdAt: new Date() } as any);
             await convo.save();
 
+            // 3. CHECK FOR HUMAN HANDOFF
             if (convo.isHumanHandoff) {
                 console.log(`⏸️ AI Skipped. Human is handling session: ${sessionId}`);
+                const autoReply = "*(System: Your message has been sent to our live team. A human agent will reply shortly.)*";
+
+                // Save admin/system notification to DB safely
+                convo.messages.push({ role: 'bot', content: autoReply, createdAt: new Date() } as any);
+                await convo.save();
+
+                io.to(sessionId).emit('bot_response_chunk', { chunk: autoReply });
+                io.to(sessionId).emit('bot_response_done');
                 return;
             }
 
+            // 4. Run AI Agent (Standard Flow / Semantic Cache)
             const stream = await generateBotResponse(botId, message, history);
             let fullBotResponse = '';
 
@@ -88,8 +101,11 @@ io.on('connection', (socket: Socket) => {
                 io.to(sessionId).emit('bot_response_chunk', { chunk });
             }
 
-            convo.messages.push({ role: 'bot', content: fullBotResponse, createdAt: new Date() } as any);
-            await convo.save();
+            // 5. SAFETY CHECK: Only save to DB if we actually have text content!
+            if (fullBotResponse && fullBotResponse.trim() !== '') {
+                convo.messages.push({ role: 'bot', content: fullBotResponse, createdAt: new Date() } as any);
+                await convo.save();
+            }
 
             io.to(sessionId).emit('bot_response_done');
 
@@ -101,6 +117,7 @@ io.on('connection', (socket: Socket) => {
         }
     });
 
+    // NEW: Listen for messages sent from the Admin Dashboard!
     socket.on('admin_chat_message', async (data: { botId: string, message: string, sessionId: string }) => {
         console.log(`👨‍💼 Admin sent message for Bot ${data.botId}: "${data.message}"`);
         const { botId, sessionId, message } = data;
@@ -108,15 +125,18 @@ io.on('connection', (socket: Socket) => {
         try {
             const botObjectId = new mongoose.Types.ObjectId(botId);
 
+            // 1. Fetch the conversation
             let convo = await Conversation.findOne({ botId: botObjectId, sessionId });
             if (!convo) {
                 console.warn(`Admin tried to reply to a non-existent conversation: ${sessionId}`);
                 return;
             }
 
+            // 2. Save the Admin's message immediately
             convo.messages.push({ role: 'admin', content: message, createdAt: new Date() } as any);
             await convo.save();
 
+            // 3. Emit ONLY to the specific user's session room
             io.to(sessionId).emit('bot_response_chunk', { chunk: message });
             io.to(sessionId).emit('bot_response_done');
 

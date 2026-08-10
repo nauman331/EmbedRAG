@@ -10,6 +10,7 @@ import mongoose from 'mongoose';
 import Bot from '../models/bot.model';
 import Tenant from '../models/tenant.model';
 import SemanticCache from '../models/semanticcache.model';
+import Lead from '../models/lead.model';
 
 export const generateBotResponse = async (botId: string, userMessage: string, history: any[] = []) => {
     const bot = await Bot.findById(botId);
@@ -67,6 +68,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
 
         console.log(`🐢 CACHE MISS. Booting up LangGraph Agent...`);
 
+
         if (!mongoose.connection.db) throw new Error('MongoDB database connection is not established yet.');
         const collection = mongoose.connection.db.collection('documentchunks');
 
@@ -96,6 +98,12 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
         const captureLeadTool = tool(
             async ({ name, email }) => {
                 console.log(`\n✅ Agent used tool: [capture_lead] -> Saved ${name} (${email})`);
+                await Lead.create({
+                    botId: new mongoose.Types.ObjectId(botId),
+                    name,
+                    email
+                });
+
                 return `Successfully saved lead. Inform the user that a human agent will contact them at ${email} shortly.`;
             },
             {
