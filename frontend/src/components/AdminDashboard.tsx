@@ -36,11 +36,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
 
     const [conversations, setConversations] = useState<any[]>([]);
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+    const [adminMessage, setAdminMessage] = useState('');
 
     const [knowledgeSources, setKnowledgeSources] = useState<any[]>([]);
     const [isLoadingSources, setIsLoadingSources] = useState(false);
 
     const [analyticsData, setAnalyticsData] = useState<any>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const fetchConversations = () => {
         fetch(`http://localhost:5000/api/conversations/${botId}`)
@@ -50,8 +52,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     };
 
     useEffect(() => {
+        let interval: any;
         if (activeTab === 'inbox') {
             fetchConversations();
+            // Live Polling: Check for new customer messages every 3 seconds
+            interval = setInterval(fetchConversations, 3000);
         } else if (activeTab === 'analytics') {
             fetch(`http://localhost:5000/api/bots/${botId}/analytics`)
                 .then(res => res.json())
@@ -60,7 +65,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
         } else if (activeTab === 'knowledge') {
             fetchKnowledgeSources();
         }
+
+        return () => { if (interval) clearInterval(interval); }
     }, [activeTab, botId]);
+
+    // Scroll to bottom when new messages arrive in the inbox
+    useEffect(() => {
+        if (activeTab === 'inbox' && messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [conversations, selectedSessionId, activeTab]);
 
     const fetchKnowledgeSources = async () => {
         setIsLoadingSources(true);
@@ -138,20 +152,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
 
             const data = await response.json();
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to upload document');
-            }
+            if (!response.ok) throw new Error(data.error || 'Failed to upload document');
 
-            setUploadStatus({
-                type: 'success',
-                message: `Success! Created ${data.chunksCreated} vector chunks from your document.`
-            });
+            setUploadStatus({ type: 'success', message: `Success! Created ${data.chunksCreated} vector chunks.` });
             setFile(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
 
-            // Refresh the table after upload
             fetchKnowledgeSources();
-
         } catch (error: any) {
             setUploadStatus({ type: 'error', message: error.message });
         } finally {
@@ -160,13 +167,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     };
 
     const handleDeleteSource = async (sourceId: string) => {
-        if (!window.confirm("Are you sure you want to delete this document? The AI will no longer know about its contents.")) return;
-
+        if (!window.confirm("Are you sure you want to delete this document?")) return;
         try {
             const res = await fetch(`http://localhost:5000/api/knowledge/${sourceId}`, { method: 'DELETE' });
-            if (res.ok) {
-                setKnowledgeSources(prev => prev.filter(s => s._id !== sourceId));
-            }
+            if (res.ok) setKnowledgeSources(prev => prev.filter(s => s._id !== sourceId));
         } catch (err) {
             console.error("Failed to delete source:", err);
         }
@@ -195,7 +199,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
 
             setSaveStatus({ type: 'success', message: 'Settings saved successfully!' });
             window.dispatchEvent(new Event('bot_settings_updated'));
-
         } catch (error: any) {
             setSaveStatus({ type: 'error', message: error.message });
         } finally {
@@ -205,24 +208,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
 
     const getAvailableModels = () => {
         switch (llmProvider) {
-            case 'GEMINI':
-                return ['gemini-3.6-flash', 'gemini-3.1-pro', 'gemini-1.5-flash'];
-            case 'OPENAI':
-                return ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
-            case 'ANTHROPIC':
-                return ['claude-3-haiku-20240307', 'claude-3-sonnet-20240229', 'claude-3-opus-20240229'];
-            default:
-                return [];
+            case 'GEMINI': return ['gemini-3.6-flash', 'gemini-3.1-pro', 'gemini-1.5-flash'];
+            case 'OPENAI': return ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
+            case 'ANTHROPIC': return ['claude-3-haiku-20240307', 'claude-3-sonnet-20240229', 'claude-3-opus-20240229'];
+            default: return [];
         }
     };
 
     const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const newProvider = e.target.value as 'GEMINI' | 'OPENAI' | 'ANTHROPIC';
         setLlmProvider(newProvider);
-
         if (newProvider === 'GEMINI') setLlmModel('gemini-3.6-flash');
         if (newProvider === 'OPENAI') setLlmModel('gpt-4o-mini');
         if (newProvider === 'ANTHROPIC') setLlmModel('claude-3-haiku-20240307');
+    };
+
+    const handleTakeOver = async (sessionId: string) => {
+        try {
+            await fetch(`http://localhost:5000/api/conversations/${sessionId}/takeover`, { method: 'POST' });
+            fetchConversations(); // Instantly refresh
+        } catch (error) {
+            console.error("Failed to take over chat", error);
+        }
+    };
+
+    const handleAdminReply = async () => {
+        if (!adminMessage.trim() || !selectedSessionId) return;
+        const msg = adminMessage;
+        setAdminMessage(''); // clear input instantly for UX
+
+        // Optimistically update UI
+        setConversations(prev => prev.map(c =>
+            c.sessionId === selectedSessionId
+                ? { ...c, messages: [...c.messages, { role: 'admin', content: msg, createdAt: new Date() }] }
+                : c
+        ));
+
+        try {
+            await fetch(`http://localhost:5000/api/conversations/${selectedSessionId}/reply`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg })
+            });
+            fetchConversations();
+        } catch (error) {
+            console.error("Failed to send reply", error);
+        }
     };
 
     return (
@@ -236,7 +267,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
                         Knowledge Base
                     </button>
-
                     <button
                         onClick={() => setActiveTab('settings')}
                         className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
@@ -244,7 +274,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                         Bot Settings
                     </button>
-
                     <button
                         onClick={() => setActiveTab('install')}
                         className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'install' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
@@ -252,7 +281,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                         Install to Website
                     </button>
-
                     <button
                         onClick={() => setActiveTab('inbox')}
                         className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'inbox' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
@@ -260,7 +288,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><polyline points="21 3 15 3 15 7 9 7 9 3 3 3 3 21 21 21 21 3z"></polyline><path d="M21 3L3 3M15 3L9 3"></path></svg>
                         Inbox
                     </button>
-
                     <button
                         onClick={() => setActiveTab('analytics')}
                         className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'analytics' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
@@ -271,7 +298,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                 </div>
             </aside>
 
-            { }
             <main className="flex-1 min-w-0">
                 {activeTab === 'knowledge' && (
                     <div className="space-y-6">
@@ -283,10 +309,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                 <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
                                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                                 </div>
-
                                 <h3 className="text-lg font-semibold text-slate-700 mb-1">Upload PDF Document</h3>
                                 <p className="text-sm text-slate-500 mb-6 max-w-sm">Drag and drop your file here, or click the button below to browse your computer.</p>
-
                                 <input type="file" accept="application/pdf" onChange={handleFileChange} ref={fileInputRef} className="hidden" id="file-upload" />
                                 <label htmlFor="file-upload" className="bg-white border border-slate-300 text-slate-700 px-6 py-2.5 rounded-lg font-medium cursor-pointer hover:bg-slate-50 transition-colors shadow-sm">
                                     {file ? 'Change File' : 'Browse Files'}
@@ -307,12 +331,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                 <div>
                                     {uploadStatus && (
                                         <div className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg ${uploadStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                                            {uploadStatus.type === 'success' ? (
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                                            ) : (
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-                                            )}
-                                            {uploadStatus.message}
+                                            {uploadStatus.type === 'success' ? '✅' : '❌'} {uploadStatus.message}
                                         </div>
                                     )}
                                 </div>
@@ -321,12 +340,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                     disabled={!file || isUploading}
                                     className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold transition-all ${!file || isUploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg'}`}
                                 >
-                                    {isUploading ? (
-                                        <>
-                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                            Processing...
-                                        </>
-                                    ) : 'Process Document'}
+                                    {isUploading ? 'Processing...' : 'Process Document'}
                                 </button>
                             </div>
                         </div>
@@ -336,7 +350,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                 <h3 className="text-lg font-bold text-slate-800">Active Knowledge Sources</h3>
                                 <p className="text-sm text-slate-500">Manage the files your AI currently has access to.</p>
                             </div>
-
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-sm text-slate-600">
                                     <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
@@ -350,18 +363,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {isLoadingSources ? (
-                                            <tr>
-                                                <td colSpan={5} className="px-6 py-8 text-center text-slate-400">Loading documents...</td>
-                                            </tr>
+                                            <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400">Loading documents...</td></tr>
                                         ) : knowledgeSources.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={5} className="px-6 py-12 text-center">
-                                                    <div className="flex flex-col items-center justify-center">
-                                                        <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                                        <span className="text-slate-500 font-medium">No knowledge sources uploaded yet.</span>
-                                                    </div>
-                                                </td>
-                                            </tr>
+                                            <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-medium">No knowledge sources uploaded yet.</td></tr>
                                         ) : (
                                             knowledgeSources.map(source => (
                                                 <tr key={source._id} className="hover:bg-slate-50 transition-colors">
@@ -370,18 +374,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                                         {source.sourceName}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide">
-                                                            {source.status}
-                                                        </span>
+                                                        <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide">{source.status}</span>
                                                     </td>
                                                     <td className="px-6 py-4 font-mono text-xs">{source.chunkCount} vectors</td>
                                                     <td className="px-6 py-4">{new Date(source.createdAt).toLocaleDateString()}</td>
                                                     <td className="px-6 py-4 text-right">
-                                                        <button
-                                                            onClick={() => handleDeleteSource(source._id)}
-                                                            className="text-slate-400 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50"
-                                                            title="Delete file and vector data"
-                                                        >
+                                                        <button onClick={() => handleDeleteSource(source._id)} className="text-slate-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50" title="Delete file and vector data">
                                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                                                         </button>
                                                     </td>
@@ -395,66 +393,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                     </div>
                 )}
 
-                { }
                 {activeTab === 'settings' && (
                     <div className="space-y-6">
                         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
                             <h2 className="text-2xl font-bold text-slate-800 mb-2">Bot Appearance & Behavior</h2>
                             <p className="text-slate-500 mb-8">Customize how your bot looks and talks to your customers on your website.</p>
-
                             <div className="space-y-6 max-w-2xl">
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-2">Bot Name</label>
-                                    <input
-                                        type="text"
-                                        value={botName}
-                                        onChange={(e) => setBotName(e.target.value)}
-                                        className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800"
-                                        placeholder="e.g., Acme Support Agent"
-                                    />
+                                    <input type="text" value={botName} onChange={(e) => setBotName(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800" placeholder="e.g., Acme Support Agent" />
                                 </div>
-
                                 <div className="relative">
                                     <label className="block text-sm font-semibold text-slate-700 mb-2">Theme Color</label>
-                                    <div
-                                        onClick={() => setShowColorPicker(!showColorPicker)}
-                                        className="flex items-center gap-3 cursor-pointer p-2 border border-slate-300 rounded-lg w-fit hover:bg-slate-50 transition-colors"
-                                    >
-                                        <div
-                                            className="w-8 h-8 rounded-md border border-slate-200 shadow-inner"
-                                            style={{ backgroundColor: colorHex }}
-                                        />
+                                    <div onClick={() => setShowColorPicker(!showColorPicker)} className="flex items-center gap-3 cursor-pointer p-2 border border-slate-300 rounded-lg w-fit hover:bg-slate-50 transition-colors">
+                                        <div className="w-8 h-8 rounded-md border border-slate-200 shadow-inner" style={{ backgroundColor: colorHex }} />
                                         <span className="font-mono text-sm font-medium text-slate-600 pr-2">{colorHex.toUpperCase()}</span>
                                     </div>
-
                                     {showColorPicker && (
                                         <div ref={colorPickerRef} className="absolute z-10 mt-2 bg-white rounded-xl shadow-xl border border-slate-100 p-3">
                                             <HexColorPicker color={colorHex} onChange={setColorHex} />
                                         </div>
                                     )}
                                 </div>
-
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-2">Welcome Message</label>
-                                    <input
-                                        type="text"
-                                        value={welcomeMessage}
-                                        onChange={(e) => setWelcomeMessage(e.target.value)}
-                                        className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800"
-                                        placeholder="What should the bot say first?"
-                                    />
+                                    <input type="text" value={welcomeMessage} onChange={(e) => setWelcomeMessage(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800" placeholder="What should the bot say first?" />
                                 </div>
-
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-2">System Prompt (Instructions)</label>
-                                    <textarea
-                                        value={systemPrompt}
-                                        onChange={(e) => setSystemPrompt(e.target.value)}
-                                        rows={5}
-                                        className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 resize-y"
-                                        placeholder="E.g., You are a helpful customer support agent. Be polite, concise, and only use the provided knowledge base."
-                                    />
-                                    <p className="text-xs text-slate-500 mt-2">These hidden instructions dictate the AI's personality and boundaries.</p>
+                                    <textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={5} className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 resize-y" placeholder="E.g., You are a helpful customer support agent..." />
                                 </div>
                             </div>
                         </div>
@@ -465,16 +432,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                 <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide">Advanced</span>
                             </div>
                             <p className="text-slate-500 mb-8">Select the language model that powers your agent and provide the necessary API keys.</p>
-
                             <div className="space-y-6 max-w-2xl">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-semibold text-slate-700 mb-2">LLM Provider</label>
-                                        <select
-                                            value={llmProvider}
-                                            onChange={handleProviderChange}
-                                            className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 bg-white"
-                                        >
+                                        <select value={llmProvider} onChange={handleProviderChange} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 bg-white">
                                             <option value="GEMINI">Google Gemini</option>
                                             <option value="OPENAI">OpenAI</option>
                                             <option value="ANTHROPIC">Anthropic Claude</option>
@@ -482,44 +444,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                     </div>
                                     <div>
                                         <label className="block text-sm font-semibold text-slate-700 mb-2">Model Version</label>
-                                        <select
-                                            value={llmModel}
-                                            onChange={(e) => setLlmModel(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 bg-white"
-                                        >
+                                        <select value={llmModel} onChange={(e) => setLlmModel(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 bg-white">
                                             {getAvailableModels().map(model => (
                                                 <option key={model} value={model}>{model}</option>
                                             ))}
                                         </select>
                                     </div>
                                 </div>
-
                                 <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
                                     <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                        {llmProvider === 'GEMINI' ? 'Google AI Studio Key' :
-                                            llmProvider === 'OPENAI' ? 'OpenAI API Key' :
-                                                'Anthropic API Key'}
+                                        {llmProvider === 'GEMINI' ? 'Google AI Studio Key' : llmProvider === 'OPENAI' ? 'OpenAI API Key' : 'Anthropic API Key'}
                                     </label>
-                                    <input
-                                        type="password"
-                                        value={
-                                            llmProvider === 'GEMINI' ? apiKeys.gemini :
-                                                llmProvider === 'OPENAI' ? apiKeys.openai :
-                                                    apiKeys.anthropic
-                                        }
-                                        onChange={(e) => setApiKeys({
-                                            ...apiKeys,
-                                            [llmProvider.toLowerCase()]: e.target.value
-                                        })}
-                                        className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 font-mono text-sm"
-                                        placeholder="sk-..."
-                                    />
-                                    <p className="text-xs text-slate-500 mt-2">
-                                        Keys are stored securely. Note: Gemini is required for vector embeddings, regardless of the chat provider selected.
-                                    </p>
+                                    <input type="password" value={llmProvider === 'GEMINI' ? apiKeys.gemini : llmProvider === 'OPENAI' ? apiKeys.openai : apiKeys.anthropic} onChange={(e) => setApiKeys({ ...apiKeys, [llmProvider.toLowerCase()]: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 font-mono text-sm" placeholder="sk-..." />
                                 </div>
                             </div>
-
                             <div className="pt-8 mt-8 border-t border-slate-100 flex items-center justify-between">
                                 <div>
                                     {saveStatus && (
@@ -528,29 +466,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                         </div>
                                     )}
                                 </div>
-                                <button
-                                    onClick={handleSaveSettings}
-                                    disabled={isSaving}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                >
-                                    {isSaving ? 'Saving...' : (
-                                        <>
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                                            Save Settings
-                                        </>
-                                    )}
+                                <button onClick={handleSaveSettings} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2">
+                                    {isSaving ? 'Saving...' : 'Save Settings'}
                                 </button>
                             </div>
                         </div>
                     </div>
                 )}
 
-                { }
                 {activeTab === 'install' && (
                     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <h2 className="text-2xl font-bold text-slate-800 mb-2">Install Your Bot</h2>
                         <p className="text-slate-500 mb-8">Copy and paste this code snippet into the <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">&lt;body&gt;</code> of your website to add the chat widget.</p>
-
                         <div className="bg-slate-900 rounded-xl overflow-hidden shadow-lg border border-slate-700">
                             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800">
                                 <div className="flex gap-2">
@@ -558,71 +485,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                     <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                                     <div className="w-3 h-3 rounded-full bg-green-500"></div>
                                 </div>
-                                <button
-                                    onClick={() => navigator.clipboard.writeText(`<script src="http://localhost:5000/api/bots/embed/${botId}"></script>`)}
-                                    className="text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded transition-colors"
-                                >
+                                <button onClick={() => navigator.clipboard.writeText(`<script src="http://localhost:5000/api/bots/embed/${botId}"></script>`)} className="text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded transition-colors">
                                     Copy Code
                                 </button>
                             </div>
                             <div className="p-6 overflow-x-auto">
-                                <pre className="text-sm font-mono text-emerald-400">
-                                    <code>
-                                        &lt;script src="http://localhost:5000/api/bots/embed/{botId}"&gt;&lt;/script&gt;
-                                    </code>
-                                </pre>
-                            </div>
-                        </div>
-
-                        <div className="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-5 flex gap-4">
-                            <div className="mt-1 text-blue-600">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                            </div>
-                            <div>
-                                <h4 className="font-semibold text-blue-900 mb-1">How it works</h4>
-                                <p className="text-sm text-blue-800 leading-relaxed">
-                                    This script is a tiny snippet that injects a secure iframe into your website. It completely isolates the bot's styling from your website's CSS, ensuring it always looks perfect and never breaks your existing layout.
-                                </p>
+                                <pre className="text-sm font-mono text-emerald-400"><code>&lt;script src="http://localhost:5000/api/bots/embed/{botId}"&gt;&lt;/script&gt;</code></pre>
                             </div>
                         </div>
                     </div>
                 )}
 
-                { }
                 {activeTab === 'inbox' && (
                     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-300">
-                        {/* Left side: List of conversations */}
                         <div className="w-1/3 border-r border-slate-200 overflow-y-auto bg-slate-50 flex flex-col">
                             <div className="p-4 border-b border-slate-200 bg-white sticky top-0 z-10 shadow-sm flex justify-between items-center">
                                 <div>
                                     <h3 className="font-bold text-slate-800">Chat History</h3>
                                     <p className="text-xs text-slate-500 mt-1">Live customer conversations</p>
                                 </div>
-                                <button
-                                    onClick={fetchConversations}
-                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    title="Refresh Inbox"
-                                >
+                                <button onClick={fetchConversations} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
                                 </button>
                             </div>
-
                             <div className="flex-1 overflow-y-auto">
                                 {conversations.length === 0 ? (
                                     <div className="p-8 text-center text-slate-500 text-sm flex flex-col items-center">
-                                        <svg className="w-10 h-10 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
                                         No conversations yet.
                                     </div>
                                 ) : (
                                     conversations.map((conv) => (
-                                        <div
-                                            key={conv._id}
-                                            onClick={() => setSelectedSessionId(conv.sessionId)}
-                                            className={`p-4 border-b border-slate-100 cursor-pointer transition-colors ${selectedSessionId === conv.sessionId ? 'bg-blue-50 border-l-4 border-l-blue-600' : 'hover:bg-slate-100 border-l-4 border-l-transparent'}`}
-                                        >
+                                        <div key={conv._id} onClick={() => setSelectedSessionId(conv.sessionId)} className={`p-4 border-b border-slate-100 cursor-pointer transition-colors ${selectedSessionId === conv.sessionId ? 'bg-blue-50 border-l-4 border-l-blue-600' : 'hover:bg-slate-100 border-l-4 border-l-transparent'}`}>
                                             <div className="flex justify-between items-start mb-1">
                                                 <span className="text-sm font-semibold text-slate-700">Visitor {conv.sessionId.substring(5, 9).toUpperCase()}</span>
-                                                <span className="text-xs text-slate-400 font-medium">{new Date(conv.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                                                {conv.isHumanHandoff && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full">Human</span>}
                                             </div>
                                             <div className="text-xs text-slate-600 truncate mt-1">
                                                 {conv.messages[conv.messages.length - 1]?.content || 'Empty chat'}
@@ -633,22 +529,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                             </div>
                         </div>
 
-                        {/* Right side: Messages */}
                         <div className="w-2/3 flex flex-col bg-white">
-                            {selectedSessionId ? (
-                                <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                                    {conversations.find(c => c.sessionId === selectedSessionId)?.messages.map((msg: any, i: number) => (
-                                        <div key={i} className={`flex flex-col max-w-[85%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
-                                            <span className="text-[11px] text-slate-400 mb-1.5 mx-2 font-medium">
-                                                {msg.role === 'user' ? 'Visitor' : 'AI Assistant'} • {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </span>
-                                            <div className={`px-4 py-3 rounded-2xl text-[14px] leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-slate-50 border border-slate-100 text-slate-800 rounded-bl-sm whitespace-pre-wrap'}`}>
-                                                {msg.content}
-                                            </div>
+                            {selectedSessionId ? (() => {
+                                const selectedConvo = conversations.find(c => c.sessionId === selectedSessionId);
+                                return (
+                                    <>
+                                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                            {selectedConvo?.messages.map((msg: any, i: number) => (
+                                                <div key={i} className={`flex flex-col max-w-[85%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
+                                                    <span className="text-[11px] text-slate-400 mb-1.5 mx-2 font-medium">
+                                                        {msg.role === 'user' ? 'Visitor' : msg.role === 'admin' ? 'You (Admin)' : 'AI Assistant'}
+                                                    </span>
+                                                    <div className={`px-4 py-3 rounded-2xl text-[14px] leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : msg.role === 'admin' ? 'bg-amber-500 text-white rounded-bl-sm' : 'bg-slate-50 border border-slate-100 text-slate-800 rounded-bl-sm whitespace-pre-wrap'}`}>
+                                                        {msg.content}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <div ref={messagesEndRef} />
                                         </div>
-                                    ))}
-                                </div>
-                            ) : (
+
+                                        {/* Handoff UI */}
+                                        {selectedConvo && !selectedConvo.isHumanHandoff && (
+                                            <div className="p-4 border-t border-slate-100 flex justify-center bg-slate-50">
+                                                <button onClick={() => handleTakeOver(selectedConvo.sessionId)} className="bg-amber-100 text-amber-700 hover:bg-amber-200 px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors flex items-center gap-2 shadow-sm">
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                                    Take Over Chat (Pause AI)
+                                                </button>
+                                            </div>
+                                        )}
+                                        {selectedConvo && selectedConvo.isHumanHandoff && (
+                                            <div className="p-4 border-t border-slate-100 bg-amber-50 flex gap-3">
+                                                <input
+                                                    type="text"
+                                                    value={adminMessage}
+                                                    onChange={(e) => setAdminMessage(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleAdminReply()}
+                                                    className="flex-1 px-4 py-2.5 rounded-lg border border-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                                                    placeholder="Type a message to the customer..."
+                                                />
+                                                <button onClick={handleAdminReply} className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors shadow-sm">
+                                                    Send Reply
+                                                </button>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })() : (
                                 <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50/50">
                                     <svg className="w-16 h-16 text-slate-200 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path></svg>
                                     Select a conversation to view the transcript
@@ -658,15 +584,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                     </div>
                 )}
 
-                { }
                 {activeTab === 'analytics' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <div>
                             <h2 className="text-2xl font-bold text-slate-800 mb-2">Performance & ROI</h2>
                             <p className="text-slate-500">Monitor your agent's usage and see how much the semantic cache is saving you.</p>
                         </div>
-
-                        {/* Top Stat Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col">
                                 <div className="flex items-center gap-3 mb-4">
@@ -676,12 +599,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                     <h3 className="text-slate-600 font-semibold">Total Sessions</h3>
                                 </div>
                                 <span className="text-3xl font-bold text-slate-800">{analyticsData?.totalConversations || 0}</span>
-                                <span className="text-sm font-medium text-emerald-500 mt-2 flex items-center gap-1">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
-                                    +12% this week
-                                </span>
                             </div>
-
                             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
@@ -690,9 +608,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                     <h3 className="text-slate-600 font-semibold">Cache Hits</h3>
                                 </div>
                                 <span className="text-3xl font-bold text-slate-800">{analyticsData?.cacheHits || 0}</span>
-                                <span className="text-sm font-medium text-slate-500 mt-2">Intercepted queries</span>
                             </div>
-
                             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col relative overflow-hidden">
                                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full opacity-50 pointer-events-none"></div>
                                 <div className="flex items-center gap-3 mb-4 relative z-10">
@@ -702,17 +618,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                     <h3 className="text-slate-600 font-semibold">API Costs Saved</h3>
                                 </div>
                                 <span className="text-3xl font-bold text-emerald-600 relative z-10">${analyticsData?.savedCost || "0.00"}</span>
-                                <span className="text-sm font-medium text-slate-500 mt-2 relative z-10">Estimated LLM savings</span>
                             </div>
                         </div>
-
-                        {/* Main Chart */}
                         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                             <div className="mb-6">
                                 <h3 className="text-lg font-bold text-slate-800">Traffic vs Cache Efficiency</h3>
-                                <p className="text-sm text-slate-500">Comparing total LLM queries vs queries intercepted by Semantic Cache.</p>
                             </div>
-
                             <div className="h-[350px] w-full">
                                 {analyticsData?.chartData ? (
                                     <ResponsiveContainer width="100%" height="100%">
@@ -730,18 +641,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                             <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
                                             <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                                            <Tooltip
-                                                contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                                itemStyle={{ fontWeight: 600 }}
-                                            />
+                                            <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} itemStyle={{ fontWeight: 600 }} />
                                             <Area type="monotone" name="Total Queries" dataKey="queries" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorQueries)" />
                                             <Area type="monotone" name="Cache Hits" dataKey="cacheHits" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorCache)" />
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded-xl text-slate-400 text-sm">
-                                        Loading chart data...
-                                    </div>
+                                    <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded-xl text-slate-400 text-sm">Loading chart data...</div>
                                 )}
                             </div>
                         </div>

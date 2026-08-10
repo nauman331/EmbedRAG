@@ -12,6 +12,7 @@ import Conversation from "./models/conversation.model"
 import mongoose from 'mongoose';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.route';
+import conversationRoutes from './routes/conversation.route';
 
 const app = express();
 app.use(cookieParser());
@@ -37,6 +38,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/bots', botRoutes);
+app.use('/api/conversations', conversationRoutes);
 
 const io = new Server(server, {
     cors: {
@@ -46,44 +48,82 @@ const io = new Server(server, {
     }
 });
 
+app.set('io', io);
+
 io.on('connection', (socket: Socket) => {
     console.log(`⚡ [Socket connected]: Client ID ${socket.id}`);
 
+    socket.on('join_session', (sessionId: string) => {
+        socket.join(sessionId);
+        console.log(`User joined session room: ${sessionId}`);
+    });
+
     socket.on('chat_message', async (data: { botId: string, message: string, history: any[], sessionId: string }) => {
         console.log(`💬 Received message for Bot ${data.botId}: "${data.message}"`);
-        try {
-            const stream = await generateBotResponse(data.botId, data.message, data.history);
+        const { botId, sessionId, message, history } = data;
 
+        socket.join(sessionId);
+
+        try {
+            const botObjectId = new mongoose.Types.ObjectId(botId);
+
+            let convo = await Conversation.findOne({ botId: botObjectId, sessionId });
+            if (!convo) {
+                convo = await Conversation.create({ botId: botObjectId, sessionId, messages: [] });
+            }
+
+            convo.messages.push({ role: 'user', content: message, createdAt: new Date() } as any);
+            await convo.save();
+
+            if (convo.isHumanHandoff) {
+                console.log(`⏸️ AI Skipped. Human is handling session: ${sessionId}`);
+                return;
+            }
+
+            const stream = await generateBotResponse(botId, message, history);
             let fullBotResponse = '';
 
             for await (const chunk of stream) {
                 fullBotResponse += chunk;
-                socket.emit('bot_response_chunk', { chunk });
+                io.to(sessionId).emit('bot_response_chunk', { chunk });
             }
 
-            const botObjectId = new mongoose.Types.ObjectId(data.botId);
+            convo.messages.push({ role: 'bot', content: fullBotResponse, createdAt: new Date() } as any);
+            await convo.save();
 
-            await Conversation.findOneAndUpdate(
-                { botId: botObjectId, sessionId: data.sessionId },
-                {
-                    $push: {
-                        messages: {
-                            $each: [
-                                { role: 'user', content: data.message, createdAt: new Date() },
-                                { role: 'bot', content: fullBotResponse, createdAt: new Date() }
-                            ]
-                        }
-                    }
-                },
-                { upsert: true, new: true }
-            );
-
-            socket.emit('bot_response_done');
+            io.to(sessionId).emit('bot_response_done');
 
         } catch (error: any) {
             console.error('Error generating bot response:', error);
-            socket.emit('bot_error', {
+            io.to(data.sessionId).emit('bot_error', {
                 error: error.message || 'I encountered an error while thinking. Please try again.'
+            });
+        }
+    });
+
+    socket.on('admin_chat_message', async (data: { botId: string, message: string, sessionId: string }) => {
+        console.log(`👨‍💼 Admin sent message for Bot ${data.botId}: "${data.message}"`);
+        const { botId, sessionId, message } = data;
+
+        try {
+            const botObjectId = new mongoose.Types.ObjectId(botId);
+
+            let convo = await Conversation.findOne({ botId: botObjectId, sessionId });
+            if (!convo) {
+                console.warn(`Admin tried to reply to a non-existent conversation: ${sessionId}`);
+                return;
+            }
+
+            convo.messages.push({ role: 'admin', content: message, createdAt: new Date() } as any);
+            await convo.save();
+
+            io.to(sessionId).emit('bot_response_chunk', { chunk: message });
+            io.to(sessionId).emit('bot_response_done');
+
+        } catch (error: any) {
+            console.error('Error sending admin response:', error);
+            socket.emit('admin_error', {
+                error: error.message || 'Encountered an error sending the message.'
             });
         }
     });
@@ -96,26 +136,6 @@ io.on('connection', (socket: Socket) => {
 app.get('/api/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', message: 'Embed RAG Backend is running.' });
 });
-
-interface ConversationParams {
-    botId: string;
-}
-
-app.get(
-    '/api/conversations/:botId',
-    async (
-        req: Request<ConversationParams>,
-        res: Response
-    ): Promise<any> => {
-        const botObjectId = new mongoose.Types.ObjectId(req.params.botId);
-
-        const conversations = await Conversation.find({
-            botId: botObjectId
-        }).sort({ updatedAt: -1 });
-
-        return res.json(conversations);
-    }
-);
 
 server.listen(port, () => {
     console.log(`[Server]: Backend is running at http://localhost:${port}`);

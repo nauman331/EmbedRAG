@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IMessage {
-    role: 'user' | 'bot';
+    role: 'user' | 'bot' | 'admin';
     content: string;
     createdAt: Date;
 }
@@ -10,12 +10,13 @@ export interface IConversation extends Document {
     botId: Types.ObjectId;
     sessionId: string;
     messages: IMessage[];
+    isHumanHandoff: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
 
 const MessageSchema: Schema = new Schema({
-    role: { type: String, enum: ['user', 'bot'], required: true },
+    role: { type: String, enum: ['user', 'bot', 'admin'], required: true },
     content: { type: String, required: true },
     createdAt: { type: Date, default: Date.now }
 });
@@ -33,7 +34,11 @@ const ConversationSchema: Schema = new Schema(
             required: true,
             index: true,
         },
-        messages: [MessageSchema]
+        messages: [MessageSchema],
+        isHumanHandoff: {
+            type: Boolean,
+            default: false
+        }
     },
     { timestamps: true }
 );

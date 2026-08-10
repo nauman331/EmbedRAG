@@ -19,6 +19,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     primaryColor = '#0b57d0',
     welcomeMessage = 'Hi there! How can I help you today?'
 }) => {
+    // --- Standard Chat States ---
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
         { role: 'bot', content: welcomeMessage }
@@ -27,10 +28,12 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
 
+    // --- Voice AI States & Refs ---
     const [isListening, setIsListening] = useState(false);
     const [voiceModeEnabled, setVoiceModeEnabled] = useState(false);
     const accumulatedResponseRef = useRef('');
 
+    // We use a ref to track voice mode inside the socket listener without causing reconnects
     const voiceModeRef = useRef(voiceModeEnabled);
     useEffect(() => {
         voiceModeRef.current = voiceModeEnabled;
@@ -57,9 +60,13 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     useEffect(() => {
         socketRef.current = io('http://localhost:5000');
 
+        // NEW: Join the specific room for this session so the Admin can direct-message this widget!
+        socketRef.current.emit('join_session', sessionId);
+
         socketRef.current.on('bot_response_chunk', (data: { chunk: string }) => {
             setIsLoading(false);
 
+            // Track the full response for TTS
             accumulatedResponseRef.current += data.chunk;
 
             setMessages((prev) => {
@@ -80,10 +87,11 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
         socketRef.current.on('bot_response_done', () => {
             console.log('Bot response completed.');
 
+            // Speak the response if voice mode is currently enabled
             if (voiceModeRef.current && accumulatedResponseRef.current) {
                 speakText(accumulatedResponseRef.current);
             }
-            accumulatedResponseRef.current = '';
+            accumulatedResponseRef.current = ''; // Reset for the next message
         });
 
         socketRef.current.on('bot_error', (data: { error: string }) => {
@@ -120,8 +128,9 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
     const speakText = (text: string) => {
         if (!('speechSynthesis' in window)) return;
-        window.speechSynthesis.cancel();
+        window.speechSynthesis.cancel(); // Stop any ongoing speech
 
+        // Remove markdown, emojis, and formatting for a cleaner voice output
         const cleanText = text
             .replace(/[*#_`~]/g, '')
             .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
@@ -139,7 +148,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
         const recognition = new SpeechRecognition();
         recognition.continuous = false;
-        recognition.interimResults = true;
+        recognition.interimResults = true; // Show text as they speak
 
         recognition.onstart = () => setIsListening(true);
 
@@ -154,6 +163,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
             console.error('Speech recognition error:', event.error);
             setIsListening(false);
 
+            // Provide friendly visual feedback to the user
             if (event.error === 'network') {
                 setInputText('Network error: Please check your connection or VPN.');
             } else if (event.error === 'not-allowed') {
@@ -162,6 +172,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                 setInputText(`Mic error: ${event.error}`);
             }
 
+            // Clear the error message after 3 seconds
             setTimeout(() => setInputText(''), 3000);
         };
 
