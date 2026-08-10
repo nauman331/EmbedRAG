@@ -27,6 +27,15 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
 
+    const [isListening, setIsListening] = useState(false);
+    const [voiceModeEnabled, setVoiceModeEnabled] = useState(false);
+    const accumulatedResponseRef = useRef('');
+
+    const voiceModeRef = useRef(voiceModeEnabled);
+    useEffect(() => {
+        voiceModeRef.current = voiceModeEnabled;
+    }, [voiceModeEnabled]);
+
     const [sessionId] = useState(() => {
         const storedId = localStorage.getItem('embedai_session_id');
         if (storedId) return storedId;
@@ -51,6 +60,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
         socketRef.current.on('bot_response_chunk', (data: { chunk: string }) => {
             setIsLoading(false);
 
+            accumulatedResponseRef.current += data.chunk;
+
             setMessages((prev) => {
                 const newMessages = [...prev];
                 const lastIndex = newMessages.length - 1;
@@ -68,6 +79,11 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
         socketRef.current.on('bot_response_done', () => {
             console.log('Bot response completed.');
+
+            if (voiceModeRef.current && accumulatedResponseRef.current) {
+                speakText(accumulatedResponseRef.current);
+            }
+            accumulatedResponseRef.current = '';
         });
 
         socketRef.current.on('bot_error', (data: { error: string }) => {
@@ -82,6 +98,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                 return newMessages;
             });
             setIsLoading(false);
+            accumulatedResponseRef.current = '';
         });
 
         return () => {
@@ -100,6 +117,64 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
             window.parent.postMessage('embedai-close', '*');
         }
     }, [isOpen]);
+
+    const speakText = (text: string) => {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+
+        const cleanText = text
+            .replace(/[*#_`~]/g, '')
+            .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        window.speechSynthesis.speak(utterance);
+    };
+
+    const toggleListen = () => {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            console.error("Speech Recognition is not supported in this browser.");
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+
+        recognition.onstart = () => setIsListening(true);
+
+        recognition.onresult = (event: any) => {
+            const transcript = Array.from(event.results)
+                .map((result: any) => result[0].transcript)
+                .join('');
+            setInputText(transcript);
+        };
+
+        recognition.onerror = (event: any) => {
+            console.error('Speech recognition error:', event.error);
+            setIsListening(false);
+
+            if (event.error === 'network') {
+                setInputText('Network error: Please check your connection or VPN.');
+            } else if (event.error === 'not-allowed') {
+                setInputText('Microphone access denied.');
+            } else {
+                setInputText(`Mic error: ${event.error}`);
+            }
+
+            setTimeout(() => setInputText(''), 3000);
+        };
+
+        recognition.onend = () => {
+            setIsListening(false);
+        };
+
+        if (isListening) {
+            recognition.stop();
+        } else {
+            recognition.start();
+        }
+    };
 
     const handleSendMessage = (e: React.FormEvent) => {
         e.preventDefault();
@@ -126,7 +201,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
     return (
         <div className="fixed bottom-6 right-6 z-[9999] font-sans antialiased">
-            {/* Custom keyframes for specific bouncy animations not built into standard Tailwind */}
             <style>
                 {`
                 @keyframes chatOpen {
@@ -162,12 +236,39 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                             </div>
                             <h3 className="m-0 text-base font-semibold tracking-wide">{botName}</h3>
                         </div>
-                        <button
-                            onClick={() => setIsOpen(false)}
-                            className="text-white/80 hover:text-white hover:bg-white/10 p-1.5 rounded-full transition-colors flex items-center justify-center"
-                        >
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        </button>
+
+                        <div className="flex gap-2 items-center">
+                            {/* Toggle Voice Output Button */}
+                            <button
+                                onClick={() => {
+                                    setVoiceModeEnabled(!voiceModeEnabled);
+                                    if (voiceModeEnabled) window.speechSynthesis.cancel();
+                                }}
+                                className={`text-white/80 hover:text-white p-2 rounded-full transition-colors flex items-center justify-center ${voiceModeEnabled ? 'bg-white/20' : 'hover:bg-white/10'}`}
+                                title={voiceModeEnabled ? "Disable Voice Output" : "Enable Voice Output"}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    {voiceModeEnabled ? (
+                                        <>
+                                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                            <line x1="23" y1="9" x2="17" y2="15"></line>
+                                            <line x1="17" y1="9" x2="23" y2="15"></line>
+                                        </>
+                                    )}
+                                </svg>
+                            </button>
+                            <button
+                                onClick={() => setIsOpen(false)}
+                                className="text-white/80 hover:text-white hover:bg-white/10 p-1.5 rounded-full transition-colors flex items-center justify-center"
+                            >
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
                     </div>
 
                     {/* Messages Area */}
@@ -213,29 +314,41 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                             onChange={(e) => setInputText(e.target.value)}
                             onFocus={() => setIsFocused(true)}
                             onBlur={() => setIsFocused(false)}
-                            placeholder="Type a message..."
+                            placeholder={isListening ? "Listening..." : "Type a message..."}
                             className="flex-1 px-5 py-3.5 rounded-full border outline-none text-[15px] transition-all duration-200"
                             style={{
-                                backgroundColor: isFocused ? '#ffffff' : '#f8fafc',
-                                borderColor: isFocused ? primaryColor : '#e2e8f0',
-                                boxShadow: isFocused ? `0 0 0 3px ${primaryColor}20` : 'none'
+                                backgroundColor: isFocused || isListening ? '#ffffff' : '#f8fafc',
+                                borderColor: isFocused || isListening ? primaryColor : '#e2e8f0',
+                                boxShadow: isFocused || isListening ? `0 0 0 3px ${primaryColor}20` : 'none'
                             }}
                         />
                         <button
-                            type="submit"
-                            disabled={isLoading || !inputText.trim()}
-                            className="w-12 h-12 rounded-full flex justify-center items-center transition-all duration-200 disabled:cursor-default"
+                            type={inputText.trim() ? "submit" : "button"}
+                            onClick={!inputText.trim() ? toggleListen : undefined}
+                            disabled={isLoading}
+                            className="w-12 h-12 rounded-full flex justify-center items-center transition-all duration-200 disabled:cursor-default shrink-0"
                             style={{
-                                backgroundColor: inputText.trim() ? primaryColor : '#f1f5f9',
-                                color: inputText.trim() ? 'white' : '#94a3b8',
-                                boxShadow: inputText.trim() ? `0 4px 12px ${primaryColor}40` : 'none',
-                                transform: inputText.trim() && !isLoading ? 'scale(1.05)' : 'scale(1)'
+                                backgroundColor: inputText.trim() || isListening ? primaryColor : '#f1f5f9',
+                                color: inputText.trim() || isListening ? 'white' : '#94a3b8',
+                                boxShadow: inputText.trim() || isListening ? `0 4px 12px ${primaryColor}40` : 'none',
+                                transform: (inputText.trim() || isListening) && !isLoading ? 'scale(1.05)' : 'scale(1)'
                             }}
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="translate-x-[2px]">
-                                <line x1="22" y1="2" x2="11" y2="13"></line>
-                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                            </svg>
+                            {isListening ? (
+                                <span className="w-3.5 h-3.5 bg-white rounded-full animate-ping"></span>
+                            ) : inputText.trim() ? (
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="translate-x-[2px]">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                            ) : (
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                                </svg>
+                            )}
                         </button>
                     </form>
                 </div>

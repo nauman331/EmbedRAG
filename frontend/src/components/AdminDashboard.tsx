@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { HexColorPicker } from 'react-colorful';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface AdminDashboardProps {
     botId: string;
@@ -7,7 +8,7 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId }) => {
-    const [activeTab, setActiveTab] = useState<'knowledge' | 'settings' | 'install' | 'inbox'>('settings'); // Default to settings for testing
+    const [activeTab, setActiveTab] = useState<'knowledge' | 'settings' | 'install' | 'inbox' | 'analytics'>('settings');
 
     const [file, setFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -36,6 +37,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     const [conversations, setConversations] = useState<any[]>([]);
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
+    const [knowledgeSources, setKnowledgeSources] = useState<any[]>([]);
+    const [isLoadingSources, setIsLoadingSources] = useState(false);
+
+    const [analyticsData, setAnalyticsData] = useState<any>(null);
+
     const fetchConversations = () => {
         fetch(`http://localhost:5000/api/conversations/${botId}`)
             .then(res => res.json())
@@ -46,8 +52,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     useEffect(() => {
         if (activeTab === 'inbox') {
             fetchConversations();
+        } else if (activeTab === 'analytics') {
+            fetch(`http://localhost:5000/api/bots/${botId}/analytics`)
+                .then(res => res.json())
+                .then(data => setAnalyticsData(data))
+                .catch(err => console.error("Failed to fetch analytics", err));
+        } else if (activeTab === 'knowledge') {
+            fetchKnowledgeSources();
         }
     }, [activeTab, botId]);
+
+    const fetchKnowledgeSources = async () => {
+        setIsLoadingSources(true);
+        try {
+            const res = await fetch(`http://localhost:5000/api/knowledge/${botId}`);
+            const data = await res.json();
+            if (res.ok) setKnowledgeSources(data);
+        } catch (err) {
+            console.error("Failed to fetch knowledge sources:", err);
+        } finally {
+            setIsLoadingSources(false);
+        }
+    };
 
     useEffect(() => {
         const fetchBotConfig = async () => {
@@ -123,10 +149,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
             setFile(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
 
+            // Refresh the table after upload
+            fetchKnowledgeSources();
+
         } catch (error: any) {
             setUploadStatus({ type: 'error', message: error.message });
         } finally {
             setIsUploading(false);
+        }
+    };
+
+    const handleDeleteSource = async (sourceId: string) => {
+        if (!window.confirm("Are you sure you want to delete this document? The AI will no longer know about its contents.")) return;
+
+        try {
+            const res = await fetch(`http://localhost:5000/api/knowledge/${sourceId}`, { method: 'DELETE' });
+            if (res.ok) {
+                setKnowledgeSources(prev => prev.filter(s => s._id !== sourceId));
+            }
+        } catch (err) {
+            console.error("Failed to delete source:", err);
         }
     };
 
@@ -185,8 +227,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
 
     return (
         <div className="flex flex-col md:flex-row gap-8 mt-4">
-
-            {/* Sidebar Navigation */}
             <aside className="w-full md:w-64 flex-shrink-0">
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col gap-2">
                     <button
@@ -205,7 +245,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                         Bot Settings
                     </button>
 
-                    { }
                     <button
                         onClick={() => setActiveTab('install')}
                         className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'install' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
@@ -221,66 +260,137 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><polyline points="21 3 15 3 15 7 9 7 9 3 3 3 3 21 21 21 21 3z"></polyline><path d="M21 3L3 3M15 3L9 3"></path></svg>
                         Inbox
                     </button>
+
+                    <button
+                        onClick={() => setActiveTab('analytics')}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'analytics' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                        Analytics
+                    </button>
                 </div>
             </aside>
 
-            {/* Main Content Area */}
+            { }
             <main className="flex-1 min-w-0">
-                { }
                 {activeTab === 'knowledge' && (
-                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                        <h2 className="text-2xl font-bold text-slate-800 mb-2">Train your AI</h2>
-                        <p className="text-slate-500 mb-8">Upload documents to expand your bot's knowledge base. It will use this context to answer customer queries.</p>
+                    <div className="space-y-6">
+                        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <h2 className="text-2xl font-bold text-slate-800 mb-2">Train your AI</h2>
+                            <p className="text-slate-500 mb-8">Upload documents to expand your bot's knowledge base. It will use this context to answer customer queries.</p>
 
-                        <div className="border-2 border-dashed border-slate-300 bg-slate-50 rounded-xl p-10 flex flex-col items-center justify-center text-center transition-all hover:bg-slate-100 hover:border-blue-300">
-                            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                            </div>
-
-                            <h3 className="text-lg font-semibold text-slate-700 mb-1">Upload PDF Document</h3>
-                            <p className="text-sm text-slate-500 mb-6 max-w-sm">Drag and drop your file here, or click the button below to browse your computer.</p>
-
-                            <input type="file" accept="application/pdf" onChange={handleFileChange} ref={fileInputRef} className="hidden" id="file-upload" />
-                            <label htmlFor="file-upload" className="bg-white border border-slate-300 text-slate-700 px-6 py-2.5 rounded-lg font-medium cursor-pointer hover:bg-slate-50 transition-colors shadow-sm">
-                                {file ? 'Change File' : 'Browse Files'}
-                            </label>
-
-                            {file && (
-                                <div className="mt-6 flex items-center gap-3 bg-white px-4 py-3 rounded-lg border border-slate-200 shadow-sm w-full max-w-md">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                                    <div className="flex-1 min-w-0 text-left">
-                                        <p className="text-sm font-semibold text-slate-700 truncate">{file.name}</p>
-                                        <p className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                                    </div>
+                            <div className="border-2 border-dashed border-slate-300 bg-slate-50 rounded-xl p-10 flex flex-col items-center justify-center text-center transition-all hover:bg-slate-100 hover:border-blue-300">
+                                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                                 </div>
-                            )}
-                        </div>
 
-                        <div className="mt-8 flex items-center justify-between border-t border-slate-100 pt-6">
-                            <div>
-                                {uploadStatus && (
-                                    <div className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg ${uploadStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                                        {uploadStatus.type === 'success' ? (
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                                        ) : (
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-                                        )}
-                                        {uploadStatus.message}
+                                <h3 className="text-lg font-semibold text-slate-700 mb-1">Upload PDF Document</h3>
+                                <p className="text-sm text-slate-500 mb-6 max-w-sm">Drag and drop your file here, or click the button below to browse your computer.</p>
+
+                                <input type="file" accept="application/pdf" onChange={handleFileChange} ref={fileInputRef} className="hidden" id="file-upload" />
+                                <label htmlFor="file-upload" className="bg-white border border-slate-300 text-slate-700 px-6 py-2.5 rounded-lg font-medium cursor-pointer hover:bg-slate-50 transition-colors shadow-sm">
+                                    {file ? 'Change File' : 'Browse Files'}
+                                </label>
+
+                                {file && (
+                                    <div className="mt-6 flex items-center gap-3 bg-white px-4 py-3 rounded-lg border border-slate-200 shadow-sm w-full max-w-md">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                        <div className="flex-1 min-w-0 text-left">
+                                            <p className="text-sm font-semibold text-slate-700 truncate">{file.name}</p>
+                                            <p className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                        </div>
                                     </div>
                                 )}
                             </div>
-                            <button
-                                onClick={handleUpload}
-                                disabled={!file || isUploading}
-                                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold transition-all ${!file || isUploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg'}`}
-                            >
-                                {isUploading ? (
-                                    <>
-                                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                        Processing...
-                                    </>
-                                ) : 'Process Document'}
-                            </button>
+
+                            <div className="mt-8 flex items-center justify-between border-t border-slate-100 pt-6">
+                                <div>
+                                    {uploadStatus && (
+                                        <div className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg ${uploadStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                                            {uploadStatus.type === 'success' ? (
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                            ) : (
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                                            )}
+                                            {uploadStatus.message}
+                                        </div>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={handleUpload}
+                                    disabled={!file || isUploading}
+                                    className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold transition-all ${!file || isUploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg'}`}
+                                >
+                                    {isUploading ? (
+                                        <>
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                            Processing...
+                                        </>
+                                    ) : 'Process Document'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300 delay-100">
+                            <div className="p-6 border-b border-slate-200">
+                                <h3 className="text-lg font-bold text-slate-800">Active Knowledge Sources</h3>
+                                <p className="text-sm text-slate-500">Manage the files your AI currently has access to.</p>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm text-slate-600">
+                                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
+                                        <tr>
+                                            <th className="px-6 py-4">File Name</th>
+                                            <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4">Data Chunks</th>
+                                            <th className="px-6 py-4">Date Uploaded</th>
+                                            <th className="px-6 py-4 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {isLoadingSources ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-8 text-center text-slate-400">Loading documents...</td>
+                                            </tr>
+                                        ) : knowledgeSources.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-12 text-center">
+                                                    <div className="flex flex-col items-center justify-center">
+                                                        <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                                        <span className="text-slate-500 font-medium">No knowledge sources uploaded yet.</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            knowledgeSources.map(source => (
+                                                <tr key={source._id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-6 py-4 font-medium text-slate-800 flex items-center gap-3">
+                                                        <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd"></path></svg>
+                                                        {source.sourceName}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide">
+                                                            {source.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 font-mono text-xs">{source.chunkCount} vectors</td>
+                                                    <td className="px-6 py-4">{new Date(source.createdAt).toLocaleDateString()}</td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button
+                                                            onClick={() => handleDeleteSource(source._id)}
+                                                            className="text-slate-400 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50"
+                                                            title="Delete file and vector data"
+                                                        >
+                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -288,7 +398,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                 { }
                 {activeTab === 'settings' && (
                     <div className="space-y-6">
-                        {/* Box 1: Appearance */}
                         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
                             <h2 className="text-2xl font-bold text-slate-800 mb-2">Bot Appearance & Behavior</h2>
                             <p className="text-slate-500 mb-8">Customize how your bot looks and talks to your customers on your website.</p>
@@ -350,7 +459,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                             </div>
                         </div>
 
-                        {/* Box 2: AI Configuration */}
                         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
                             <div className="flex items-center gap-3 mb-2">
                                 <h2 className="text-2xl font-bold text-slate-800">AI Configuration</h2>
@@ -480,7 +588,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                     </div>
                 )}
 
-                {/* INBOX TAB */}
+                { }
                 {activeTab === 'inbox' && (
                     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-300">
                         {/* Left side: List of conversations */}
@@ -546,6 +654,96 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                     Select a conversation to view the transcript
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                { }
+                {activeTab === 'analytics' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800 mb-2">Performance & ROI</h2>
+                            <p className="text-slate-500">Monitor your agent's usage and see how much the semantic cache is saving you.</p>
+                        </div>
+
+                        {/* Top Stat Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                                    </div>
+                                    <h3 className="text-slate-600 font-semibold">Total Sessions</h3>
+                                </div>
+                                <span className="text-3xl font-bold text-slate-800">{analyticsData?.totalConversations || 0}</span>
+                                <span className="text-sm font-medium text-emerald-500 mt-2 flex items-center gap-1">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                                    +12% this week
+                                </span>
+                            </div>
+
+                            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                                    </div>
+                                    <h3 className="text-slate-600 font-semibold">Cache Hits</h3>
+                                </div>
+                                <span className="text-3xl font-bold text-slate-800">{analyticsData?.cacheHits || 0}</span>
+                                <span className="text-sm font-medium text-slate-500 mt-2">Intercepted queries</span>
+                            </div>
+
+                            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col relative overflow-hidden">
+                                <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full opacity-50 pointer-events-none"></div>
+                                <div className="flex items-center gap-3 mb-4 relative z-10">
+                                    <div className="w-10 h-10 bg-slate-900 text-emerald-400 rounded-xl flex items-center justify-center">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                                    </div>
+                                    <h3 className="text-slate-600 font-semibold">API Costs Saved</h3>
+                                </div>
+                                <span className="text-3xl font-bold text-emerald-600 relative z-10">${analyticsData?.savedCost || "0.00"}</span>
+                                <span className="text-sm font-medium text-slate-500 mt-2 relative z-10">Estimated LLM savings</span>
+                            </div>
+                        </div>
+
+                        {/* Main Chart */}
+                        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                            <div className="mb-6">
+                                <h3 className="text-lg font-bold text-slate-800">Traffic vs Cache Efficiency</h3>
+                                <p className="text-sm text-slate-500">Comparing total LLM queries vs queries intercepted by Semantic Cache.</p>
+                            </div>
+
+                            <div className="h-[350px] w-full">
+                                {analyticsData?.chartData ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={analyticsData.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="colorQueries" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                                </linearGradient>
+                                                <linearGradient id="colorCache" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                                            <Tooltip
+                                                contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                                itemStyle={{ fontWeight: 600 }}
+                                            />
+                                            <Area type="monotone" name="Total Queries" dataKey="queries" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorQueries)" />
+                                            <Area type="monotone" name="Cache Hits" dataKey="cacheHits" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorCache)" />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded-xl text-slate-400 text-sm">
+                                        Loading chart data...
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}

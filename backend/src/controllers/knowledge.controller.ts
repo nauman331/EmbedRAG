@@ -50,7 +50,7 @@ export const uploadKnowledge = async (req: Request, res: Response): Promise<any>
 
         const embeddings = new GoogleGenerativeAIEmbeddings({
             apiKey: tenant.apiKeys.gemini,
-            model: 'text-embedding-004',
+            model: process.env.EMBEDDING_MODEL || 'text-embedding-004',
         });
 
         const textsToEmbed = docs.map(doc => doc.pageContent);
@@ -64,8 +64,6 @@ export const uploadKnowledge = async (req: Request, res: Response): Promise<any>
             text: doc.pageContent,
             embedding: vectorArrays[index]
         }));
-
-        await DocumentChunk.deleteMany({ botId: new mongoose.Types.ObjectId(botId) });
 
         await DocumentChunk.insertMany(chunkDocs);
 
@@ -89,5 +87,31 @@ export const uploadKnowledge = async (req: Request, res: Response): Promise<any>
         }
 
         return res.status(500).json({ error: error.message || 'Failed to process document.' });
+    }
+};
+
+export const getKnowledgeSources = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const botId = req.params.botId;
+        const sources = await KnowledgeSource.find({ botId }).sort({ createdAt: -1 });
+        return res.status(200).json(sources);
+    } catch (error) {
+        console.error('Error fetching knowledge sources:', error);
+        return res.status(500).json({ error: 'Failed to fetch knowledge sources' });
+    }
+};
+
+export const deleteKnowledgeSource = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const sourceId = req.params.sourceId;
+
+        await DocumentChunk.deleteMany({ sourceId });
+
+        await KnowledgeSource.findByIdAndDelete(sourceId);
+
+        return res.status(200).json({ message: 'Document and vector chunks deleted successfully.' });
+    } catch (error) {
+        console.error('Error deleting knowledge source:', error);
+        return res.status(500).json({ error: 'Failed to delete knowledge source' });
     }
 };
