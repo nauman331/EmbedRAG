@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/user.modal';
 import Tenant from '../models/tenant.model';
 import RefreshToken, { IRefreshToken } from '../models/refreshtoken.model';
-import UAParser from 'ua-parser-js';
+import * as UAParserPackage from 'ua-parser-js';
 
 const getAccessSecret = () => process.env.JWT_ACCESS_SECRET!;
 const getRefreshSecret = () => process.env.JWT_REFRESH_SECRET!;
@@ -22,7 +22,8 @@ const extractDeviceInfo = (req: Request) => {
     const uaHeader = req.headers['user-agent'];
     const uaString = Array.isArray(uaHeader) ? uaHeader[0] : uaHeader || 'Unknown';
 
-    const parser = new (UAParser as any)(uaString);
+    const UAParser = (UAParserPackage as any).UAParser || (UAParserPackage as any).default || UAParserPackage;
+    const parser = new UAParser(uaString);
     const result = parser.getResult();
 
     const rawIp = req.ip || req.headers['x-forwarded-for'] || 'Unknown';
@@ -50,7 +51,7 @@ export const register = async (req: Request, res: Response): Promise<any> => {
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        await User.create({
+        const user = await User.create({
             email,
             passwordHash,
             tenantId: tenant._id

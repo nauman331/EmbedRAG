@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { fetchWithAuth } from '../utils/api';
 
 interface AdminDashboardProps {
     botId: string;
@@ -8,7 +9,7 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId }) => {
-    const [activeTab, setActiveTab] = useState<'knowledge' | 'settings' | 'install' | 'inbox' | 'analytics' | 'leads'>('settings');
+    const [activeTab, setActiveTab] = useState<'knowledge' | 'settings' | 'install' | 'inbox' | 'analytics' | 'leads' | 'security'>('settings');
 
     const [file, setFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -43,6 +44,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
 
     const [analyticsData, setAnalyticsData] = useState<any>(null);
     const [leads, setLeads] = useState<any[]>([]);
+
+    const [sessions, setSessions] = useState<any[]>([]);
+    const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const fetchConversations = () => {
@@ -69,10 +74,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                 .then(res => res.json())
                 .then(data => setLeads(data))
                 .catch(err => console.error("Failed to fetch leads", err));
+        } else if (activeTab === 'security') {
+            fetchSessions();
         }
 
         return () => { if (interval) clearInterval(interval); }
     }, [activeTab, botId]);
+
+    const fetchSessions = async () => {
+        setIsLoadingSessions(true);
+        try {
+            const res = await fetchWithAuth('http://localhost:5000/api/auth/sessions');
+            if (res.ok) {
+                const data = await res.json();
+                setSessions(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch sessions:", err);
+        } finally {
+            setIsLoadingSessions(false);
+        }
+    };
+
+    const handleRevokeSession = async (sessionId: string) => {
+        if (!window.confirm("Are you sure you want to log out of that device?")) return;
+        try {
+            const res = await fetchWithAuth(`http://localhost:5000/api/auth/sessions/${sessionId}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                setSessions(prev => prev.filter(s => s.id !== sessionId));
+            }
+        } catch (err) {
+            console.error("Failed to revoke session:", err);
+        }
+    };
 
     useEffect(() => {
         if (activeTab === 'inbox' && messagesEndRef.current) {
@@ -325,10 +361,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                         Captured Leads
                     </button>
+                    <button
+                        onClick={() => setActiveTab('security')}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'security' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        Security & Sessions
+                    </button>
                 </div>
             </aside>
 
-            { }
             <main className="flex-1 min-w-0">
                 {activeTab === 'knowledge' && (
                     <div className="space-y-6">
@@ -742,6 +784,75 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                                 </td>
                                                 <td className="px-6 py-4 text-right text-slate-500">
                                                     {new Date(lead.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- NEW: SECURITY & SESSIONS TAB --- */}
+                {activeTab === 'security' && (
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <div className="p-6 border-b border-slate-200 bg-slate-50">
+                            <h3 className="text-lg font-bold text-slate-800">Active Sessions</h3>
+                            <p className="text-sm text-slate-500 mt-1">Manage the devices that are currently logged into your account. You can remotely log out of unrecognized or old devices.</p>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm text-slate-600">
+                                <thead className="bg-white text-slate-500 text-xs uppercase font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-6 py-4">Device / OS</th>
+                                        <th className="px-6 py-4">IP Address</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 bg-white">
+                                    {isLoadingSessions ? (
+                                        <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-400">Loading sessions...</td></tr>
+                                    ) : sessions.length === 0 ? (
+                                        <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-400">No active sessions found.</td></tr>
+                                    ) : (
+                                        sessions.map((session) => (
+                                            <tr key={session.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4 font-semibold text-slate-800 flex items-center gap-3">
+                                                    {session.deviceType.toLowerCase().includes('mobile') ? (
+                                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                                                    ) : (
+                                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                                                    )}
+                                                    {session.deviceType}
+                                                    <span className="text-xs font-normal text-slate-400 ml-2">
+                                                        Since {new Date(session.createdAt).toLocaleDateString()}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 font-mono text-xs">{session.ipAddress}</td>
+                                                <td className="px-6 py-4">
+                                                    {session.isCurrentDevice ? (
+                                                        <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide">
+                                                            Current Device
+                                                        </span>
+                                                    ) : (
+                                                        <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide">
+                                                            Active
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    {!session.isCurrentDevice && (
+                                                        <button
+                                                            onClick={() => handleRevokeSession(session.id)}
+                                                            className="text-red-600 hover:text-red-700 font-medium text-sm transition-colors hover:bg-red-50 px-3 py-1.5 rounded-lg"
+                                                            title="Log out from this device"
+                                                        >
+                                                            Revoke Access
+                                                        </button>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))
