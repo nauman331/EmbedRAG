@@ -5,6 +5,11 @@ export interface IRefreshToken extends Document {
     token: string;
     expiresAt: Date;
     revoked: boolean;
+    deviceInfo: {
+        userAgent: string;
+        ipAddress: string;
+        deviceType: string;
+    };
     createdAt: Date;
 }
 
@@ -29,6 +34,11 @@ const RefreshTokenSchema: Schema = new Schema(
         revoked: {
             type: Boolean,
             default: false,
+        },
+        deviceInfo: {
+            userAgent: { type: String, default: 'Unknown' },
+            ipAddress: { type: String, default: 'Unknown' },
+            deviceType: { type: String, default: 'Unknown' }
         }
     },
     { timestamps: { createdAt: true, updatedAt: false } }
