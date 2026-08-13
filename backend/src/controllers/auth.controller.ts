@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/user.modal';
 import Tenant from '../models/tenant.model';
+import Bot from '../models/bot.model';
 import RefreshToken, { IRefreshToken } from '../models/refreshtoken.model';
 import * as UAParserPackage from 'ua-parser-js';
 
@@ -51,11 +52,22 @@ export const register = async (req: Request, res: Response): Promise<any> => {
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        const user = await User.create({
+        await User.create({
             email,
             passwordHash,
             tenantId: tenant._id
         });
+
+        await Bot.create({
+            tenantId: tenant._id,
+            name: `${companyName} Support Agent`,
+            llmProvider: 'GEMINI',
+            llmModel: 'gemini-3.6-flash',
+            systemPrompt: `You are a helpful customer support agent for ${companyName}. Answer questions based only on the provided knowledge base.`,
+            welcomeMessage: `Hi there! Welcome to ${companyName}. How can I help you today?`,
+            colorHex: '#0b57d0'
+        });
+
 
         return res.status(201).json({ message: 'User registered successfully. Please log in.' });
     } catch (error: any) {

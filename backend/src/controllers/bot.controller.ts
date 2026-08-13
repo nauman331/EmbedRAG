@@ -3,7 +3,19 @@ import Bot from '../models/bot.model';
 import Tenant from '../models/tenant.model';
 import SemanticCache from '../models/semanticcache.model';
 import Conversation from '../models/conversation.model';
+import { AuthRequest } from '../middlewares/auth.middleware';
 
+
+export const getWorkspaceBots = async (req: AuthRequest, res: Response): Promise<any> => {
+    try {
+        const tenantId = req.user?.tenantId;
+        const bots = await Bot.find({ tenantId });
+        return res.status(200).json(bots);
+    } catch (error: any) {
+        console.error('Error fetching workspace bots:', error);
+        return res.status(500).json({ error: 'Failed to fetch your bots.' });
+    }
+};
 
 export const getBotConfig = async (req: Request, res: Response): Promise<any> => {
     try {
@@ -15,7 +27,6 @@ export const getBotConfig = async (req: Request, res: Response): Promise<any> =>
         }
 
         const tenant = await Tenant.findById(bot.tenantId);
-
         const responseData = {
             ...bot.toObject(),
             apiKeys: tenant?.apiKeys || { openai: '', anthropic: '', gemini: '' }
@@ -27,6 +38,7 @@ export const getBotConfig = async (req: Request, res: Response): Promise<any> =>
         return res.status(500).json({ error: 'Failed to fetch bot configuration.' });
     }
 };
+
 
 export const updateBotConfig = async (req: Request, res: Response): Promise<any> => {
     try {
