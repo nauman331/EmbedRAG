@@ -5,14 +5,30 @@ import { ChatAnthropic } from '@langchain/anthropic';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
-import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { MemorySaver } from '@langchain/langgraph';
 import mongoose from 'mongoose';
 import Bot from '../models/bot.model';
 import Tenant from '../models/tenant.model';
 import SemanticCache from '../models/semanticcache.model';
 import Lead from '../models/lead.model';
 
-export const generateBotResponse = async (botId: string, userMessage: string, history: any[] = []) => {
+
+const checkpointer = new MemorySaver();
+const embeddingCache = new Map<string, GoogleGenerativeAIEmbeddings>();
+const llmCache = new Map<string, any>();
+
+const getEmbeddings = (apiKey: string) => {
+    if (!embeddingCache.has(apiKey)) {
+        embeddingCache.set(apiKey, new GoogleGenerativeAIEmbeddings({
+            apiKey: apiKey,
+            model: process.env.EMBEDDING_MODEL,
+        }));
+    }
+    return embeddingCache.get(apiKey)!;
+};
+
+export const generateBotResponse = async (botId: string, userMessage: string, sessionId: string) => {
     const bot = await Bot.findById(botId);
     if (!bot) throw new Error('Bot not found.');
 
@@ -20,22 +36,13 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
     if (!tenant) throw new Error('Tenant not found.');
 
     const geminiKey = tenant.apiKeys?.gemini || process.env.GEMINI_API_KEY || '';
-    if (!geminiKey || geminiKey.includes('put_your') || geminiKey.trim() === '') {
-        throw new Error('⚠️ Please add a valid Gemini API Key in your dashboard for vector embeddings.');
+    if (!geminiKey || geminiKey.includes('put_your')) {
+        throw new Error('⚠️ Please add a valid Gemini API Key in your dashboard.');
     }
 
-    let llmKey = '';
-    if (bot.llmProvider === 'GEMINI') llmKey = geminiKey;
-    else if (bot.llmProvider === 'OPENAI') llmKey = tenant.apiKeys?.openai || process.env.OPENAI_API_KEY || '';
-    else if (bot.llmProvider === 'ANTHROPIC') llmKey = tenant.apiKeys?.anthropic || process.env.ANTHROPIC_API_KEY || '';
-
     try {
-        const embeddings = new GoogleGenerativeAIEmbeddings({
-            apiKey: geminiKey,
-            model: process.env.EMBEDDING_MODEL || 'text-embedding-004',
-        });
+        const embeddings = getEmbeddings(geminiKey);
 
-        console.log(`\n🔍 Checking Semantic Cache for: "${userMessage}"...`);
         const questionEmbedding = await embeddings.embedQuery(userMessage);
 
         const cachedResults = await SemanticCache.aggregate([
@@ -49,27 +56,18 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
                     filter: { botId: new mongoose.Types.ObjectId(botId) }
                 }
             },
-            {
-                $project: {
-                    answer: 1,
-                    score: { $meta: "vectorSearchScore" }
-                }
-            }
+            { $project: { answer: 1, score: { $meta: "vectorSearchScore" } } }
         ]);
 
         if (cachedResults.length > 0 && cachedResults[0].score > 0.95) {
             console.log(`⚡ CACHE HIT! (Score: ${cachedResults[0].score}). Saving LLM costs.`);
-
-            async function* generateCachedChunks() {
-                yield "⚡ " + cachedResults[0].answer;
-            }
+            async function* generateCachedChunks() { yield "⚡ " + cachedResults[0].answer; }
             return generateCachedChunks();
         }
 
         console.log(`🐢 CACHE MISS. Booting up LangGraph Agent...`);
 
-
-        if (!mongoose.connection.db) throw new Error('MongoDB database connection is not established yet.');
+        if (!mongoose.connection.db) throw new Error('MongoDB not connected.');
         const collection = mongoose.connection.db.collection('documentchunks');
 
         const vectorStore = new MongoDBAtlasVectorSearch(embeddings, {
@@ -82,28 +80,36 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
         const retriever = vectorStore.asRetriever({ k: 4, filter: { botId: new mongoose.Types.ObjectId(botId) } });
 
         const searchKnowledgeBaseTool = tool(
-            async ({ query }) => {
-                console.log(`\n🔍 Agent used tool: [search_knowledge_base] for -> "${query}"`);
-                const relevantDocs = await retriever.invoke(query);
-                if (relevantDocs.length === 0) return "No relevant information found in the knowledge base.";
-                return relevantDocs.map(doc => doc.pageContent).join('\n\n');
+            async ({ query, expandedQueries }) => {
+                console.log(`\n🔍 [RAG TOOL] Original: "${query}"`);
+                console.log(`   ↳ Expanded Search: ${expandedQueries.join(', ')}`);
+
+                const allResults = await Promise.all([
+                    retriever.invoke(query),
+                    ...expandedQueries.map(q => retriever.invoke(q))
+                ]);
+
+                const uniqueDocs = new Map();
+                allResults.flat().forEach(doc => uniqueDocs.set(doc.pageContent, doc));
+
+                const finalDocs = Array.from(uniqueDocs.values());
+                if (finalDocs.length === 0) return "No relevant information found in the knowledge base.";
+                return finalDocs.map(doc => doc.pageContent).join('\n\n');
             },
             {
                 name: 'search_knowledge_base',
-                description: 'Search the company knowledge base for facts, policies, and product details.',
-                schema: z.object({ query: z.string() })
+                description: 'Search the company knowledge base. You MUST provide the original query AND 2 alternate phrasing variations to ensure a match.',
+                schema: z.object({
+                    query: z.string(),
+                    expandedQueries: z.array(z.string()).describe("Provide 2-3 alternate ways to ask this question to broaden the search.")
+                })
             }
         );
 
         const captureLeadTool = tool(
             async ({ name, email }) => {
-                console.log(`\n✅ Agent used tool: [capture_lead] -> Saved ${name} (${email})`);
-                await Lead.create({
-                    botId: new mongoose.Types.ObjectId(botId),
-                    name,
-                    email
-                });
-
+                console.log(`\n✅ [LEAD TOOL] Saving ${name} (${email})`);
+                await Lead.create({ botId: new mongoose.Types.ObjectId(botId), name, email });
                 return `Successfully saved lead. Inform the user that a human agent will contact them at ${email} shortly.`;
             },
             {
@@ -113,33 +119,40 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
             }
         );
 
-        let llm;
-        const temperature = 0.2;
+        let llmKey = '';
+        if (bot.llmProvider === 'GEMINI') llmKey = geminiKey;
+        else if (bot.llmProvider === 'OPENAI') llmKey = tenant.apiKeys?.openai || process.env.OPENAI_API_KEY || '';
+        else if (bot.llmProvider === 'ANTHROPIC') llmKey = tenant.apiKeys?.anthropic || process.env.ANTHROPIC_API_KEY || '';
 
-        if (bot.llmProvider === 'OPENAI') {
-            llm = new ChatOpenAI({ apiKey: llmKey, modelName: bot.llmModel || 'gpt-4o-mini', temperature, streaming: true });
-        } else if (bot.llmProvider === 'ANTHROPIC') {
-            llm = new ChatAnthropic({ apiKey: llmKey, modelName: bot.llmModel || 'claude-3-haiku-20240307', temperature, streaming: true });
-        } else {
-            llm = new ChatGoogleGenerativeAI({ apiKey: llmKey, model: bot.llmModel || process.env.CHAT_MODEL || 'gemini-3.6-flash', temperature });
+        const cacheKey = `${bot.llmProvider}_${bot.llmModel}_${botId}`;
+        let llm = llmCache.get(cacheKey);
+
+        if (!llm) {
+            const temperature = 0.2;
+            if (bot.llmProvider === 'OPENAI') {
+                llm = new ChatOpenAI({ apiKey: llmKey, modelName: bot.llmModel, temperature, streaming: true });
+            } else if (bot.llmProvider === 'ANTHROPIC') {
+                llm = new ChatAnthropic({ apiKey: llmKey, modelName: bot.llmModel, temperature, streaming: true });
+            } else {
+                llm = new ChatGoogleGenerativeAI({ apiKey: llmKey, model: bot.llmModel, temperature });
+            }
+            llmCache.set(cacheKey, llm);
         }
 
         const agent = createReactAgent({
             llm: llm,
             tools: [searchKnowledgeBaseTool, captureLeadTool],
+            checkpointSaver: checkpointer,
         });
 
-        const formattedMessages = history.map(msg =>
-            msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)
-        );
-
         const finalMessages = [
-            new SystemMessage(`${bot.systemPrompt}\n\nYou have tools available. Only use 'search_knowledge_base' if you need factual data from the context.`),
-            ...formattedMessages,
+            new SystemMessage(`${bot.systemPrompt}\n\nYou have tools available. Only use 'search_knowledge_base' if you need factual data.`),
             new HumanMessage(userMessage)
         ];
 
-        const eventStream = await agent.streamEvents({ messages: finalMessages }, { version: "v2" });
+        const config = { configurable: { thread_id: sessionId } };
+
+        const eventStream = await agent.streamEvents({ messages: finalMessages }, { ...config, version: "v2" });
 
         async function* generateTextChunks() {
             let fullAgentResponse = '';
@@ -161,7 +174,6 @@ export const generateBotResponse = async (botId: string, userMessage: string, hi
             }
 
             if (fullAgentResponse.trim() !== '') {
-                console.log(`💾 Saving response to Semantic Cache...`);
                 await SemanticCache.create({
                     botId: new mongoose.Types.ObjectId(botId),
                     question: userMessage,

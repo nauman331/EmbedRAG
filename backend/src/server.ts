@@ -95,7 +95,7 @@ io.on('connection', (socket: Socket) => {
                 return;
             }
 
-            const stream = await generateBotResponse(botId, message, history);
+            const stream = await generateBotResponse(data.botId, data.message, data.sessionId);
             let fullBotResponse = '';
 
             for await (const chunk of stream) {
