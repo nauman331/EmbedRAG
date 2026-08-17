@@ -122,7 +122,7 @@ In your MongoDB Atlas Dashboard, create a new Atlas Vector Search index on the d
 {
   "fields": [
     {
-      "numDimensions": 768,
+      "numDimensions": 3072,
       "path": "embedding",
       "similarity": "cosine",
       "type": "vector"
