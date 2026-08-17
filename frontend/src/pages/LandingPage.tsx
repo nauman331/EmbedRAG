@@ -106,6 +106,12 @@ const SCRIPT: Omit<LedgerRow, 'status'>[] = [
     { id: 4, q: 'Can I pay yearly instead?', latency: 0, cost: 0 },
 ];
 const RESULT: Record<number, 'miss' | 'hit'> = { 1: 'miss', 2: 'hit', 3: 'miss', 4: 'hit' };
+const ANSWERS: Record<number, string> = {
+    1: 'You can request a full refund within 14 days of purchase — no questions asked.',
+    2: 'You can request a full refund within 14 days of purchase — no questions asked.',
+    3: 'Yes! Switching to annual billing saves you 20% and can be done anytime from your account settings.',
+    4: 'Yes! Switching to annual billing saves you 20% and can be done anytime from your account settings.',
+};
 
 const CacheLedgerDemo: React.FC = () => {
     const [rows, setRows] = useState<LedgerRow[]>([]);
@@ -142,7 +148,7 @@ const CacheLedgerDemo: React.FC = () => {
     return (
         <div className="bg-slate-900 rounded-3xl p-5 sm:p-8 md:p-10 max-w-3xl mx-auto shadow-2xl shadow-slate-900/20">
             <div className="flex items-center justify-between mb-6">
-                <span className="text-slate-400 text-xs sm:text-sm font-mono">cache-ledger.log</span>
+                <span className="text-slate-400 text-sm">Your support widget</span>
                 <span className="flex gap-1.5" aria-hidden="true">
                     <span className="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
                     <span className="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
@@ -151,43 +157,47 @@ const CacheLedgerDemo: React.FC = () => {
             </div>
 
             <div className="bg-white rounded-2xl overflow-hidden">
-                <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-4 sm:px-5 py-3 border-b border-slate-100 text-[11px] font-mono uppercase tracking-wide text-slate-400">
-                    <span>Query</span>
-                    <span className="text-right pr-1">Latency</span>
-                    <span className="text-right w-16">Result</span>
-                </div>
-                <div className="min-h-[220px] px-4 sm:px-5 divide-y divide-slate-50">
+                <div className="min-h-[260px] px-4 sm:px-5 py-4 space-y-4">
                     {rows.length === 0 && !playing && (
-                        <div className="py-16 text-center text-sm text-slate-400 font-mono">run the demo to replay a live conversation</div>
+                        <div className="py-16 text-center text-sm text-slate-400">Press play to watch a real conversation unfold</div>
                     )}
                     {rows.map((row) => (
-                        <div key={row.id} className="grid grid-cols-[1fr_auto_auto] gap-2 py-3 items-center animate-[fadeIn_0.3s_ease-out]">
-                            <span className="text-sm text-slate-700 truncate pr-2">{row.q}</span>
-                            <span className="text-xs font-mono text-slate-400 text-right pr-1">
-                                {row.status === 'pending' ? '···' : row.status === 'hit' ? '0ms' : `${row.latency}ms`}
-                            </span>
-                            <span className="text-right w-16">
-                                {row.status === 'pending' && (
-                                    <span className="text-[11px] font-mono text-slate-400">reasoning</span>
-                                )}
-                                {row.status === 'miss' && (
-                                    <span className="text-[11px] font-mono font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-500">MISS</span>
-                                )}
-                                {row.status === 'hit' && (
-                                    <span className="text-[11px] font-mono font-semibold px-2 py-1 rounded-md bg-emerald-100 text-emerald-700">HIT</span>
-                                )}
-                            </span>
+                        <div key={row.id} className="space-y-2 animate-[fadeIn_0.3s_ease-out]">
+                            <div className="flex justify-end">
+                                <div className="bg-blue-600 text-white text-sm px-4 py-2 rounded-2xl rounded-br-sm max-w-[80%]">
+                                    {row.q}
+                                </div>
+                            </div>
+                            {row.status === 'pending' && (
+                                <div className="flex justify-start">
+                                    <div className="bg-slate-100 text-slate-400 text-sm px-4 py-2 rounded-2xl rounded-bl-sm">
+                                        thinking&hellip;
+                                    </div>
+                                </div>
+                            )}
+                            {(row.status === 'miss' || row.status === 'hit') && (
+                                <div className="flex justify-start flex-col items-start gap-1">
+                                    <div className="bg-slate-100 text-slate-800 text-sm px-4 py-2 rounded-2xl rounded-bl-sm max-w-[80%]">
+                                        {ANSWERS[row.id]}
+                                    </div>
+                                    {row.status === 'miss' ? (
+                                        <span className="text-[11px] text-slate-400 pl-1">Worked it out in {(row.latency / 1000).toFixed(1)}s</span>
+                                    ) : (
+                                        <span className="text-[11px] font-semibold text-emerald-600 pl-1">Instant reply — didn&rsquo;t cost you a thing</span>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
                 <div className="flex items-center justify-between px-4 sm:px-5 py-4 bg-slate-50 border-t border-slate-100">
                     <div>
-                        <p className="text-[11px] font-mono uppercase tracking-wide text-slate-400">Cache hit rate</p>
-                        <p className="text-lg font-bold text-slate-800 font-mono">{hitRate}%</p>
+                        <p className="text-xs text-slate-400">Answered instantly</p>
+                        <p className="text-lg font-bold text-slate-800">{hitRate}%</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[11px] font-mono uppercase tracking-wide text-slate-400">Saved this session</p>
-                        <p className="text-lg font-bold text-emerald-600 font-mono">${saved.toFixed(4)}</p>
+                        <p className="text-xs text-slate-400">Money saved so far</p>
+                        <p className="text-lg font-bold text-emerald-600">${saved.toFixed(4)}</p>
                     </div>
                 </div>
             </div>
@@ -198,10 +208,10 @@ const CacheLedgerDemo: React.FC = () => {
                     disabled={playing}
                     className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
                 >
-                    {playing ? 'Replaying conversation…' : rows.length ? 'Run it again' : 'Run the demo'}
+                    {playing ? 'Playing conversation…' : rows.length ? 'Watch it again' : 'Watch the demo'}
                 </button>
                 <p className="text-xs text-slate-400 max-w-xs">
-                    Row 4 rephrases row 3 entirely &mdash; it still hits, because the cache matches on meaning, not exact text.
+                    The last question is worded completely differently &mdash; and it&rsquo;s still answered instantly, because your AI understands what&rsquo;s being asked, not just the exact words.
                 </p>
             </div>
         </div>
@@ -212,12 +222,12 @@ const CacheLedgerDemo: React.FC = () => {
 /*  Static content                                                     */
 /* ------------------------------------------------------------------ */
 const featureCards = [
-    { icon: Icon.stack, tone: 'neutral', title: 'Knowledge ingestion', text: 'Upload your PDFs. We chunk, embed, and store them in a secure, metadata-filtered vector database.' },
-    { icon: Icon.bolt, tone: 'accent', title: 'Semantic caching', text: 'Repeated questions above 95% similarity are answered instantly, at zero latency and zero API cost.' },
-    { icon: Icon.handoff, tone: 'brand', title: 'Live human handoff', text: 'Watch conversations in real time over WebSockets, and take over any chat with one click.' },
-    { icon: Icon.building, tone: 'neutral', title: 'True multi-tenancy', text: "Database-level metadata filtering keeps every company's knowledge base sealed off from every other." },
-    { icon: Icon.lock, tone: 'neutral', title: 'Bank-grade sessions', text: 'Short-lived JWTs, HttpOnly refresh cookies, and a dashboard to revoke access from any device.' },
-    { icon: Icon.chart, tone: 'accent', title: 'ROI analytics', text: 'A live dashboard tracking total queries, cache hit rate, and the dollars your cache has saved.' },
+    { icon: Icon.stack, tone: 'neutral', title: 'Learns your business', text: 'Upload your PDFs, help docs, or FAQs and your AI agent learns everything it needs to know in minutes.' },
+    { icon: Icon.bolt, tone: 'accent', title: 'Never answers twice', text: "Once a question's been answered, everyone who asks something similar gets an instant reply — free." },
+    { icon: Icon.handoff, tone: 'brand', title: 'Jump in anytime', text: 'Watching a conversation go sideways? Take it over yourself with one click, mid-chat.' },
+    { icon: Icon.building, tone: 'neutral', title: 'Your data stays yours', text: "Manage more than one brand or client? Each one's information is kept completely separate, automatically." },
+    { icon: Icon.lock, tone: 'neutral', title: 'Built-in account security', text: 'Secure logins, sessions that expire on their own, and the ability to sign out any device you don\u2019t recognize.' },
+    { icon: Icon.chart, tone: 'accent', title: 'See what you\u2019re saving', text: 'A simple dashboard shows how many questions got answered, and how much money it saved you.' },
 ];
 const toneClasses: Record<string, string> = {
     neutral: 'bg-slate-100 text-slate-600',
@@ -226,36 +236,36 @@ const toneClasses: Record<string, string> = {
 };
 
 const steps = [
-    { title: 'Visitor asks a question', text: "Your widget sends the message over a WebSocket the moment it's typed." },
-    { title: 'Cache checks for a match', text: 'A vector similarity search looks for a question your agent has already answered.' },
-    { title: 'Agent reasons and retrieves', text: 'On a cache miss, the LangGraph agent decides whether to query your knowledge base, ask a clarifying question, or call a tool.' },
-    { title: 'Answer streams back', text: "The response streams to the widget token by token — or an admin takes over live if it's needed." },
+    { title: 'A customer asks a question', text: 'The moment someone types into your chat widget, your AI agent is listening — no delay, no page reload.' },
+    { title: 'It checks what it already knows', text: "If someone's asked something similar before, your customer gets that answer back immediately." },
+    { title: 'It looks up the answer', text: "If it's something new, the AI reads through your uploaded docs to work out the best response — or asks a follow-up question if it needs one." },
+    { title: 'Your customer gets a reply', text: "The answer appears right in the chat — or, if it's a tricky one, your team can step in and take it from there." },
 ];
 
 const personas = [
-    { title: 'Support leads', text: "See exactly which questions the AI handles alone, and step into the ones it can't — without losing context." },
-    { title: 'Platform engineers', text: 'Bring your own LLM, self-host the vector index, and keep every tenant\u2019s data provably separate.' },
-    { title: 'Founders', text: 'Ship support coverage on day one, then watch the ROI dashboard show exactly what the cache is saving you.' },
+    { title: 'Support leads', text: "See exactly which questions your AI is handling on its own, and step in personally on the ones it can't." },
+    { title: 'Founders & small teams', text: 'Get round-the-clock support coverage from day one, without hiring a support team to do it.' },
+    { title: 'Agencies & multi-brand teams', text: "Run AI support for every client from one dashboard, with each client's data kept completely separate." },
 ];
 
 const stats = [
-    { value: 40, suffix: '%', label: 'avg. cost reduction from caching' },
-    { value: 5, suffix: ' min', label: 'to deploy your first widget' },
-    { value: 95, suffix: '%', label: 'similarity threshold for a cache hit' },
+    { value: 40, suffix: '%', label: 'average drop in support costs' },
+    { value: 5, suffix: ' min', label: 'to get your AI agent live' },
+    { value: 24, suffix: '/7', label: 'support coverage, even while you sleep' },
 ];
 
 const faqs = [
-    { q: 'How is a cache hit different from a normal LLM answer?', a: 'A cache hit is served from a prior answer whose question matched the new one above a 95% vector similarity threshold — no model call happens, so it returns in milliseconds at no API cost. A miss goes through the full LangGraph agent.' },
-    { q: 'Which LLMs can I use?', a: 'EmbedAI routes between Google Gemini, OpenAI, and Anthropic models per workspace, so you can pick a provider per bot or fail over between them.' },
-    { q: "Can one tenant's AI see another tenant's documents?", a: "No. Every document chunk is filtered by workspace at the database level, so a bot can only retrieve knowledge that belongs to its own tenant." },
-    { q: 'What happens when I take over a chat?', a: 'Clicking "pause the AI" in the admin inbox stops the agent from responding and hands the WebSocket connection to you in real time, with the full conversation history already loaded.' },
-    { q: 'Is this open source?', a: 'Yes — the project is MIT licensed. You can self-host the full stack against your own MongoDB Atlas cluster and LLM API keys.' },
+    { q: 'How is this different from a regular chatbot?', a: "A regular chatbot just matches keywords to canned replies. EmbedAI actually reads your documents and reasons through an answer — and once it's answered a question, it remembers, so it's never charging you to answer the same one twice." },
+    { q: 'Which AI models power it?', a: "You can choose from several leading AI providers — including Google, OpenAI, and Anthropic — and switch between them per site without any extra setup." },
+    { q: "If I manage more than one brand, can their data mix together?", a: 'No. Each site\u2019s knowledge base and conversations are kept completely separate, even when they\u2019re managed from the same account.' },
+    { q: 'What happens when I take over a chat?', a: "One click pauses the AI and hands you the conversation instantly, with the full chat history already loaded — your customer won't even notice the switch." },
+    { q: 'Can I run this on my own servers?', a: "Yes. EmbedAI is open source, so your team can self-host the whole thing if you'd rather keep everything in-house." },
 ];
 
 const plans = [
-    { name: 'Starter', monthly: 0, annual: 0, blurb: 'For testing the widget on one site.', features: ['1 workspace', '500 queries / mo', 'Community support', 'Semantic cache included'], cta: 'Start for free', featured: false },
-    { name: 'Growth', monthly: 79, annual: 63, blurb: 'For teams shipping AI support to production.', features: ['5 workspaces', '20,000 queries / mo', 'Live human handoff', 'ROI analytics dashboard', 'Email support'], cta: 'Start free trial', featured: true },
-    { name: 'Enterprise', monthly: null, annual: null, blurb: 'For multi-tenant deployments at scale.', features: ['Unlimited workspaces', 'Dedicated vector index', 'SSO & audit logs', 'Uptime SLA', 'Dedicated support'], cta: 'Talk to sales', featured: false },
+    { name: 'Starter', monthly: 0, annual: 0, blurb: 'For testing the widget on one site.', features: ['1 website', '500 questions answered / mo', 'Community support', 'Automatic answer caching'], cta: 'Start for free', featured: false },
+    { name: 'Growth', monthly: 79, annual: 63, blurb: 'For teams putting AI support into production.', features: ['5 websites', '20,000 questions answered / mo', 'Live agent hand-off', 'Savings dashboard', 'Email support'], cta: 'Start free trial', featured: true },
+    { name: 'Enterprise', monthly: null, annual: null, blurb: 'For larger teams managing multiple brands.', features: ['Unlimited websites', 'Private, dedicated AI environment', 'Single sign-on & audit logs', 'Uptime guarantee', 'Dedicated support'], cta: 'Talk to sales', featured: false },
 ];
 
 const navLinks = [
@@ -330,7 +340,7 @@ export const LandingPage: React.FC = () => {
 
             <Helmet>
                 <title>EmbedAI | Autonomous AI Agents for Customer Support</title>
-                <meta name="description" content="Deploy an autonomous AI agent to your website in under 5 minutes. Reduce support costs with our semantic caching layer." />
+                <meta name="description" content="Put an AI agent on your website in under 5 minutes. It answers your customers instantly and never charges you twice for the same question." />
                 <meta property="og:title" content="EmbedAI | Enterprise Customer Support" />
                 <meta property="og:description" content="Automate your customer support securely with EmbedAI." />
                 <meta property="og:type" content="website" />
@@ -395,8 +405,8 @@ export const LandingPage: React.FC = () => {
                 {/* ---------------- Hero ---------------- */}
                 <section className="pt-20 sm:pt-28 pb-16 px-6 max-w-7xl mx-auto text-center">
                     <FadeIn>
-                        <span className="inline-flex items-center gap-2 text-xs font-mono font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-full mb-6">
-                            {Icon.dot} MIT licensed &middot; self-hostable
+                        <span className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-full mb-6">
+                            {Icon.dot} No credit card required &middot; live in minutes
                         </span>
                     </FadeIn>
                     <FadeIn delay={80}>
@@ -412,13 +422,13 @@ export const LandingPage: React.FC = () => {
                     </FadeIn>
                     <FadeIn delay={160}>
                         <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed">
-                            Upload your company PDFs, set your brand colors, and deploy an autonomous AI agent to your website in under 5 minutes. A built-in semantic cache means you never pay to answer the same question twice.
+                            Upload your help docs, match your brand, and put an AI agent on your website in minutes. It remembers every answer it's already given, so your customers get instant replies and you never pay twice for the same question.
                         </p>
                     </FadeIn>
                     <FadeIn delay={240}>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                             <a href="/login" className="bg-slate-900 hover:bg-slate-800 text-white text-lg font-semibold px-8 py-4 rounded-full transition-all shadow-xl hover:shadow-2xl hover:-translate-y-0.5 flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-900">
-                                Start Building for Free
+                                Get Started Free
                                 {Icon.arrow}
                             </a>
                             <a href="#how-it-works" className="text-slate-600 hover:text-slate-900 font-semibold px-8 py-4 flex items-center gap-2 transition-colors">
@@ -427,8 +437,8 @@ export const LandingPage: React.FC = () => {
                         </div>
                     </FadeIn>
                     <FadeIn delay={320}>
-                        <p className="text-xs font-mono text-slate-400 mt-10 tracking-wide">
-                            LANGGRAPH AGENTS &middot; MONGODB VECTOR SEARCH &middot; GEMINI / OPENAI / ANTHROPIC
+                        <p className="text-sm text-slate-400 mt-10">
+                            Powered by leading AI models from Google, OpenAI, and Anthropic
                         </p>
                     </FadeIn>
                 </section>
@@ -445,8 +455,8 @@ export const LandingPage: React.FC = () => {
                 {/* ---------------- Cache ledger demo ---------------- */}
                 <section className="px-6 py-24">
                     <FadeIn className="max-w-3xl mx-auto text-center mb-10">
-                        <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">Watch the cache pay for itself.</h2>
-                        <p className="text-slate-500 text-lg">A miss reasons over your knowledge base. A hit — even worded differently — costs nothing.</p>
+                        <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">See it save you money, live.</h2>
+                        <p className="text-slate-500 text-lg">The first time, your AI works out the answer. Every time after — even asked differently — it's instant, and free.</p>
                     </FadeIn>
                     <FadeIn delay={100}>
                         <CacheLedgerDemo />
@@ -457,8 +467,8 @@ export const LandingPage: React.FC = () => {
                 <section id="how-it-works" className="bg-white py-24 border-t border-slate-200">
                     <div className="max-w-5xl mx-auto px-6">
                         <FadeIn className="text-center mb-16">
-                            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">One message, four decisions.</h2>
-                            <p className="text-slate-500 text-lg">What happens between a visitor's question and your agent's answer.</p>
+                            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">From question to answer, automatically.</h2>
+                            <p className="text-slate-500 text-lg">Here's what happens every time someone messages your support widget.</p>
                         </FadeIn>
                         <div className="relative grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
                             <div className="hidden md:block absolute left-1/2 top-5 bottom-5 w-px bg-slate-200 -translate-x-1/2" aria-hidden="true"></div>
@@ -481,8 +491,8 @@ export const LandingPage: React.FC = () => {
                 <section id="features" className="py-24 border-t border-slate-200">
                     <div className="max-w-7xl mx-auto px-6">
                         <FadeIn className="text-center mb-16">
-                            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Enterprise-grade infrastructure.</h2>
-                            <p className="text-slate-500 text-lg">Built for speed, security, and maximum ROI.</p>
+                            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Everything your support team needs.</h2>
+                            <p className="text-slate-500 text-lg">No engineering required — it just works.</p>
                         </FadeIn>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -505,9 +515,9 @@ export const LandingPage: React.FC = () => {
                 <section id="security" className="bg-slate-900 py-24">
                     <div className="max-w-5xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
                         <FadeIn>
-                            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Security your compliance team will actually sign off on.</h2>
+                            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Security your IT team will actually sign off on.</h2>
                             <p className="text-slate-400 text-lg leading-relaxed mb-8">
-                                Every workspace is isolated at the database level, every session is short-lived, and every device can be revoked in one click.
+                                Your account is isolated from every other customer's, logins expire on their own, and you can sign out any device in one click.
                             </p>
                             <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5">
                                 <p className="text-xs font-mono uppercase tracking-wide text-slate-400 mb-3">Active devices</p>
@@ -526,11 +536,11 @@ export const LandingPage: React.FC = () => {
                         <FadeIn delay={100}>
                             <ul className="space-y-4">
                                 {[
-                                    'Short-lived JWTs in memory, HttpOnly refresh cookies',
-                                    'Concurrent session limits — max 5 devices, remotely revocable',
-                                    'Device fingerprinting across OS, browser, and IP',
-                                    'Refresh tokens rotate on use; theft triggers full revocation',
-                                    'Rate limiting on logins, uploads, and API calls',
+                                    'Logins expire on their own, so an old or stolen link can\u2019t be reused',
+                                    'Sign in on up to 5 devices, and sign any of them out remotely',
+                                    'We recognize your usual devices, so anything unfamiliar stands out',
+                                    'If we ever detect a stolen session, every device is signed out instantly',
+                                    'Built-in protection against break-in attempts and abuse',
                                 ].map((item) => (
                                     <li key={item} className="flex items-start gap-3 text-slate-200">
                                         <span className="mt-1 shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
@@ -549,7 +559,7 @@ export const LandingPage: React.FC = () => {
                     <div className="max-w-6xl mx-auto px-6">
                         <FadeIn className="text-center mb-16">
                             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Built for the whole team.</h2>
-                            <p className="text-slate-500 text-lg">Different people, same dashboard.</p>
+                            <p className="text-slate-500 text-lg">Whoever's running the show, EmbedAI fits how you work.</p>
                         </FadeIn>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             {personas.map((p, i) => (
@@ -569,7 +579,7 @@ export const LandingPage: React.FC = () => {
                     <div className="max-w-7xl mx-auto px-6">
                         <FadeIn className="text-center mb-10">
                             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Pricing that scales with your queries.</h2>
-                            <p className="text-slate-500 text-lg">Cache hits are always free — you only pay for what the agent actually has to think about.</p>
+                            <p className="text-slate-500 text-lg">Repeat questions are always free to answer — you only pay when your AI has to work something out for the first time.</p>
                         </FadeIn>
 
                         <FadeIn delay={80} className="flex items-center justify-center gap-3 mb-14">
@@ -654,10 +664,10 @@ export const LandingPage: React.FC = () => {
                 <section className="px-6 py-20">
                     <FadeIn className="max-w-4xl mx-auto bg-slate-900 rounded-3xl px-10 py-16 text-center relative overflow-hidden">
                         <span className="absolute -top-10 -right-10 w-40 h-40 bg-emerald-500/10 rounded-full" aria-hidden="true"></span>
-                        <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 relative">Your first workspace takes five minutes.</h2>
+                        <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 relative">Your first AI agent takes five minutes.</h2>
                         <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto relative">Upload a PDF, pick your brand color, and drop one script tag on your site.</p>
                         <a href="/login" className="relative inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white text-lg font-semibold px-8 py-4 rounded-full transition-all shadow-xl hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400">
-                            Start Building for Free
+                            Get Started Free
                             {Icon.arrow}
                         </a>
                     </FadeIn>
@@ -679,7 +689,7 @@ export const LandingPage: React.FC = () => {
                                 </div>
                                 <span className="text-lg font-bold text-white">EmbedAI</span>
                             </div>
-                            <p className="text-sm leading-relaxed max-w-xs">Autonomous support agents, deployed to your site in minutes.</p>
+                            <p className="text-sm leading-relaxed max-w-xs">AI-powered support, live on your site in minutes.</p>
                         </div>
                         <div>
                             <h4 className="text-white text-sm font-semibold mb-4">Product</h4>
