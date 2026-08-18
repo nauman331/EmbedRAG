@@ -76,7 +76,15 @@ export const register = async (req: Request, res: Response): Promise<any> => {
         const existingUser = await User.findOne({ email: email.toLowerCase() });
         if (existingUser) return res.status(400).json({ error: 'Email is already in use.' });
 
-        const tenant = await Tenant.create({ email: email.toLowerCase(), companyName });
+        // Check if an orphaned tenant exists (e.g. from a previously failed registration)
+        let tenant = await Tenant.findOne({ email: email.toLowerCase() });
+        if (tenant) {
+            tenant.companyName = companyName;
+            await tenant.save();
+        } else {
+            tenant = await Tenant.create({ email: email.toLowerCase(), companyName });
+        }
+
         const salt = await bcrypt.genSalt(12); // 12 rounds for production strength
         const passwordHash = await bcrypt.hash(password, salt);
 
