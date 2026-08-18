@@ -33,10 +33,11 @@ const hashToken = (token: string): string => {
 };
 
 const setRefreshTokenCookie = (res: Response, token: string) => {
+    const isProd = process.env.NODE_ENV === 'production';
     res.cookie('jwt_refresh', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: isProd,
+        sameSite: isProd ? 'none' : 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000
     });
 };
@@ -167,7 +168,8 @@ export const refreshTokens = async (req: Request, res: Response): Promise<any> =
     }
 
     const currentRefreshToken = cookies.jwt_refresh;
-    res.clearCookie('jwt_refresh', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' });
+    const isProd = process.env.NODE_ENV === 'production';
+    res.clearCookie('jwt_refresh', { httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' });
 
     try {
         // Verify the JWT signature first (catches expired/tampered tokens)
@@ -226,7 +228,8 @@ export const logout = async (req: Request, res: Response): Promise<any> => {
     const refreshToken = cookies.jwt_refresh;
     const hashedToken = hashToken(refreshToken);
     await RefreshToken.findOneAndUpdate({ token: hashedToken }, { revoked: true });
-    res.clearCookie('jwt_refresh', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' });
+    const isProd = process.env.NODE_ENV === 'production';
+    res.clearCookie('jwt_refresh', { httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' });
 
     return res.status(200).json({ message: 'Logged out successfully.' });
 };
