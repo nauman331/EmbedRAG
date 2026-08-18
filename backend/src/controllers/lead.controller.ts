@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import Lead from '../models/lead.model';
+import Lead from '../models/lead.model.js';
 
 export const getLeads = async (req: Request, res: Response): Promise<any> => {
     try {

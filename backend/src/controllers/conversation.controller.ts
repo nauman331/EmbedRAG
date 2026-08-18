@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import Conversation from '../models/conversation.model';
+import Conversation from '../models/conversation.model.js';
 
 export const getConversations = async (req: Request, res: Response): Promise<any> => {
     try {
