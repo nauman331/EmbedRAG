@@ -42,10 +42,22 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
                 credentials: 'include'
             });
 
-            const data = await res.json();
+            let data: any = {};
+            const text = await res.text();
+            
+            if (text) {
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.warn('Non-JSON response received:', text);
+                }
+            }
 
             if (!res.ok) {
-                throw new Error(data.error || 'Authentication failed');
+                if (res.status === 502 || res.status === 503) {
+                    throw new Error('Server is temporarily starting up or down. Please wait a moment and try again.');
+                }
+                throw new Error(data.error || `Authentication failed (${res.status})`);
             }
 
             if (isLogin) {
