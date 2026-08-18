@@ -70,7 +70,6 @@ app.use(cors({
         console.error(`🚨 CORS BLOCKED: Origin "${origin}" not in allowed list:`, allowedOrigins);
         return callback(new Error(`CORS: Origin ${origin} not allowed.`));
     },
-    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true
 }));
