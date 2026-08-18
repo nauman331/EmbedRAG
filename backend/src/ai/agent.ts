@@ -184,10 +184,10 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
             llm,
             tools: [searchKnowledgeBaseTool, captureLeadTool],
             checkpointSaver: checkpointer,
+            prompt: new SystemMessage(`${bot.systemPrompt}\n\nYou have tools available. Only use 'search_knowledge_base' if you need factual data.`),
         });
 
         const finalMessages = [
-            new SystemMessage(`${bot.systemPrompt}\n\nYou have tools available. Only use 'search_knowledge_base' if you need factual data.`),
             new HumanMessage(userMessage)
         ];
 
