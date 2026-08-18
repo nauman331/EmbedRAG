@@ -118,7 +118,7 @@ const CacheLedgerDemo: React.FC = () => {
     const [playing, setPlaying] = useState(false);
     const timeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-    const saved = rows.filter((r) => r.status === 'hit').reduce((sum, r, i, arr) => {
+    const saved = rows.filter((r) => r.status === 'hit').reduce((sum, _, i, arr) => {
         const priorMiss = SCRIPT.find((s) => s.q === arr[i].q && RESULT[s.id] === 'miss');
         return sum + (priorMiss ? priorMiss.cost : 0);
     }, 0);
