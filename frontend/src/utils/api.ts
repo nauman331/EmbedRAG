@@ -1,4 +1,8 @@
-const API_URL = import.meta.env.VITE_API_URL;
+let rawApiUrl = import.meta.env.VITE_API_URL || '';
+if (rawApiUrl && !rawApiUrl.startsWith('http')) {
+    rawApiUrl = `https://${rawApiUrl}`;
+}
+export const API_URL = rawApiUrl;
 
 let currentAccessToken: string | null = null;
 
@@ -53,5 +57,3 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}): Pro
 
     return response;
 };
-
-export { API_URL };
