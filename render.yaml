@@ -12,7 +12,7 @@ services:
     name: embedai-backend
     runtime: node
     rootDir: backend
-    buildCommand: npm install --legacy-peer-deps && npm run build
+    buildCommand: NODE_ENV=development npm install --legacy-peer-deps && npm run build
     startCommand: node dist/server.js
     healthCheckPath: /api/health
     autoDeploy: true
