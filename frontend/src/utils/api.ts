@@ -9,11 +9,19 @@ export const setAccessToken = (token: string | null) => {
 export const getAccessToken = () => currentAccessToken;
 
 export const fetchWithAuth = async (url: string, options: RequestInit = {}): Promise<Response> => {
-    const makeHeaders = (token: string | null) => ({
-        ...options.headers,
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-    });
+    const makeHeaders = (token: string | null) => {
+        const headers: Record<string, string> = {
+            'Authorization': `Bearer ${token}`,
+            ...options.headers as Record<string, string>
+        };
+
+        // Do not force application/json for FormData, as the browser must set the boundary automatically
+        if (!(options.body instanceof FormData) && !headers['Content-Type'] && !headers['content-type']) {
+            headers['Content-Type'] = 'application/json';
+        }
+
+        return headers;
+    };
 
     let response = await fetch(url, { ...options, headers: makeHeaders(currentAccessToken) });
 
