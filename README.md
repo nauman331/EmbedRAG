@@ -1,124 +1,131 @@
-🚀 EmbedAI: Autonomous Agent SaaS & Live Support Platform
+# 🤖 EmbedAI — Embeddable AI Customer Support SaaS
 
-EmbedAI is a multi-tenant, enterprise-grade SaaS platform that allows businesses to upload their knowledge bases, train an AI agent, and deploy a customizable support widget to their website in minutes.
+> **Multi-tenant, production-ready platform** to train AI agents on your knowledge base and embed them on any website with a single `<script>` tag.
 
-Unlike standard "dumb" API wrappers, EmbedAI is powered by LangGraph for autonomous tool-calling, features Semantic Caching to slash LLM costs, and includes real-time WebSocket Human Handoff for when the AI needs backup.
+[![CI](https://github.com/yourusername/embedai/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/embedai/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-✨ Enterprise-Grade Features
+---
 
-🧠 Agentic Workflows (LangGraph): The AI doesn't just answer questions; it reasons. It autonomously decides when to query the Vector DB, when to ask clarifying questions, and when to trigger Zod-validated tools (like capturing lead info for frustrated users).
+## ✨ Features
 
-⚡ Semantic Caching Layer: Intercepts repeated customer questions using Vector Similarity Search. If a match is found (>95% similarity), it serves the cached answer instantly with 0 latency and $0.00 API cost.
+| Feature | Details |
+|---------|---------|
+| 🧠 **Agentic RAG** | LangGraph-powered agent with autonomous tool calling — decides when to search KB, capture leads, or escalate |
+| ⚡ **Semantic Caching** | MongoDB Vector Search intercepts repeated questions at >95% similarity — 0 LLM cost |
+| 🤝 **Live Human Handoff** | Admins pause the AI and take over any conversation in real-time via Socket.io |
+| 🔒 **Bank-Grade Auth** | Short-lived JWTs in memory + long-lived hashed HttpOnly refresh cookies + concurrent session limits + reuse detection |
+| 🏢 **True Multi-Tenancy** | Metadata filtering at DB level — Tenant A's bot never sees Tenant B's documents |
+| 🎙️ **Voice AI** | Browser Speech Recognition + Text-to-Speech built into the chat widget |
+| 📊 **Real Analytics** | Queries per day, cache hit rate, and estimated cost savings — real MongoDB aggregation, not mock data |
+| 📎 **One-Line Embed** | `<script src="https://api.embedai.com/api/bots/embed/{botId}"></script>` |
 
-🤝 Live Human Handoff (WebSockets): Admins can monitor live AI chats in their dashboard. With one click, they can "Pause the AI" and seamlessly take over the conversation in real-time.
+---
 
-🔒 Bank-Grade Session Security: Short-lived JWTs in memory, long-lived HttpOnly refresh cookies, concurrent session limits (max 5 devices), and a dashboard to remotely revoke access from unknown devices.
+## 🏗️ Architecture
 
-🏢 True Multi-Tenancy: Secure metadata filtering at the database level ensures that Company A's AI can never hallucinate and leak Company B's uploaded PDFs.
-
-📊 ROI Analytics: Real-time dashboard tracking total queries, cache hits, and calculated dollars saved.
-
-🛠️ Tech Stack
-
-Frontend:
-
-React.js 18 (Vite)
-
-TypeScript
-
-Tailwind CSS
-
-Recharts (Analytics)
-
-React Router DOM & React Helmet Async (SEO)
-
-Backend & AI Engine:
-
-Node.js & Express.js
-
-MongoDB Atlas (Document Storage & Vector Search)
-
-Socket.io (Real-time WebSockets)
-
-LangChain.js & LangGraph (Agent Orchestration)
-
-Google Gemini / OpenAI / Anthropic (Dynamic LLM Routing)
-
-🏗️ System Architecture
-
+```mermaid
 graph TD
-    User([Website Visitor]) -->|Types Question| Widget(Chat Widget)
-    Widget -->|WebSocket Emit| Server(Express Backend)
-    
-    Server --> CacheCheck{Semantic Cache}
-    
-    CacheCheck -->|Similarity > 95%| CacheHit[Return Cached Answer]
+    Visitor([Website Visitor]) -->|Types Question| Widget(Chat Widget / iframe)
+    Widget -->|Socket Emit| Server(Express + Socket.io)
+
+    Server --> CacheCheck{Semantic Cache\nMongoDB Vector Search}
+
+    CacheCheck -->|Score > 95%| CacheHit[Return Cached Answer\n0ms · $0.00]
     CacheHit --> Widget
-    
-    CacheCheck -->|Cache Miss| LangGraph[LangGraph Agent]
-    
-    LangGraph <--> Checkpointer[(Thread Memory)]
-    LangGraph <--> VectorDB[(MongoDB Vector Search)]
-    LangGraph <--> Tools{Zod Tools}
-    
-    Tools -->|Frustrated User?| LeadDB[(Lead Database)]
-    Tools -->|Requires Factual Data?| VectorDB
-    
-    LangGraph -->|Stream Chunks| Widget
-    
+
+    CacheCheck -->|Cache Miss| Agent[LangGraph ReAct Agent]
+
+    Agent <-->|Persistent Memory| Checkpointer[(MongoDBSaver)]
+    Agent <-->|RAG Retrieval| VectorDB[(MongoDB Atlas\nVector Search)]
+    Agent <-->|Lead Capture| LeadDB[(Lead Collection)]
+
+    Agent -->|Stream Chunks| Widget
+
     Admin([Company Admin]) -->|Monitors| Dashboard(Admin Inbox)
-    Server <-->|Live Sync| Dashboard
+    Server <-->|Socket Rooms| Dashboard
     Dashboard -->|Take Over Chat| Server
+```
 
+---
 
-🚀 Local Development Setup
+## 🛠️ Tech Stack
 
-1. Prerequisites
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 19, TypeScript, Vite, Tailwind CSS v4 |
+| **Backend** | Node.js, Express 5, TypeScript |
+| **AI / LLM** | LangChain.js, LangGraph (ReAct agent), Google Gemini / OpenAI / Anthropic |
+| **Database** | MongoDB Atlas (Vector Search, document storage) |
+| **Real-time** | Socket.io |
+| **Auth** | JWT (access 15m) + Hashed HttpOnly refresh cookies (7d) |
+| **Observability** | Winston structured logging |
+| **Infrastructure** | Docker, Docker Compose, GitHub Actions CI |
 
-Node.js (v18+)
+---
 
-MongoDB Atlas Cluster (with a created Vector Search Index)
+## 🚀 Quick Start
 
-Google Gemini API Key (or OpenAI/Anthropic)
+### One Command (Docker)
 
-2. Clone and Install
+```bash
+git clone https://github.com/yourusername/embedai.git && cd embedai
 
-git clone https://github.com/yourusername/embedai.git
-cd embedai
+# 1. Configure backend secrets (see table below)
+cp backend/.env.example backend/.env && nano backend/.env
 
-# Install Backend Dependencies
-cd backend
-npm install
+# 2. Configure frontend URLs
+cp frontend/.env.example frontend/.env.local
 
-# Install Frontend Dependencies
-cd ../frontend
-npm install
+# 3. Start everything
+docker compose up --build
+```
 
+Navigate to **http://localhost:80**
 
-3. Environment Variables
+### Manual Setup
 
-Create a .env file in the /backend directory:
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for step-by-step local development setup.
+
+---
+
+## 🔐 Environment Variables
+
+### Backend (`backend/.env`)
+
+```bash
+# Generate JWT secrets with:
+# openssl rand -hex 64
 
 PORT=5000
-FRONTEND_URL=http://localhost:5173
+NODE_ENV=production
 MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/embedai
-JWT_ACCESS_SECRET=your_super_secret_access_key
-JWT_REFRESH_SECRET=your_super_secret_refresh_key
+FRONTEND_URL=https://app.yoursite.com
+ALLOWED_ORIGINS=https://app.yoursite.com,https://www.yoursite.com
 
-# Default AI Models
-CHAT_MODEL=gemini-3.6-flash
-EMBEDDING_MODEL=text-embedding-004
+JWT_ACCESS_SECRET=<64-char-random-hex>
+JWT_REFRESH_SECRET=<different-64-char-random-hex>
 
-# Optional: LangSmith Tracing
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=your_langsmith_key
-LANGCHAIN_PROJECT=EmbedAI_Local
+EMBEDDING_MODEL=gemini-embedding-001
+GEMINI_MODEL=gemini-2.0-flash
+```
 
+### Frontend (`frontend/.env.local`)
 
-4. Configure MongoDB Vector Search Index
+```bash
+VITE_API_URL=https://api.yoursite.com
+VITE_SOCKET_URL=https://api.yoursite.com
+```
 
-In your MongoDB Atlas Dashboard, create a new Atlas Vector Search index on the documentchunks collection named vector_index using this JSON:
+---
 
+## 🗄️ MongoDB Atlas Setup
+
+### 1. Vector Search Index — `documentchunks` collection
+
+Index name: `vector_index`
+
+```json
 {
   "fields": [
     {
@@ -133,40 +140,110 @@ In your MongoDB Atlas Dashboard, create a new Atlas Vector Search index on the d
     }
   ]
 }
+```
 
+### 2. Semantic Cache Index — `semanticcaches` collection
 
-5. Run the Application
+Index name: `cache_vector_index`
 
-Open two terminal windows:
+```json
+{
+  "fields": [
+    {
+      "numDimensions": 3072,
+      "path": "embedding",
+      "similarity": "cosine",
+      "type": "vector"
+    },
+    {
+      "path": "botId",
+      "type": "filter"
+    }
+  ]
+}
+```
 
-Terminal 1 (Backend):
+### 3. LangGraph Checkpoints — `langgraph_checkpoints` collection
 
-cd backend
-npm run dev
+No special index required — automatically managed by `MongoDBSaver`.
 
+---
 
-Terminal 2 (Frontend):
+## 🌐 Embedding the Widget
 
-cd frontend
-npm run dev
+After creating your bot in the dashboard, go to **Install** tab and copy your embed snippet:
 
+```html
+<script src="https://api.yoursite.com/api/bots/embed/{YOUR_BOT_ID}"></script>
+```
 
-Navigate to http://localhost:5173 to view the landing page and create your first workspace!
+Paste it before the closing `</body>` tag on any website.
 
-🛡️ Security Best Practices Implemented
+---
 
-Rate Limiting: Protects against Brute Force logins, API exhaustion, and malicious bulk document uploads.
+## 🛡️ Security Model
 
-Device Fingerprinting: ua-parser-js tracks OS, browser, and IP address for active session management.
+| Threat | Mitigation |
+|--------|-----------|
+| Unauthenticated API access | All admin routes require `requireAuth` + `requireBotOwnership` |
+| Cross-tenant data leaks | `requireBotOwnership` middleware verifies `bot.tenantId === req.user.tenantId` |
+| DB breach token replay | Refresh tokens stored as SHA-256 HMAC hashes, never plaintext |
+| Token theft | Reuse of a revoked refresh token triggers revocation of ALL sessions for that user |
+| File upload abuse | Multer limits: 10 MB max, PDF MIME type only |
+| JSON payload DoS | `express.json({ limit: '1mb' })` |
+| Brute force | `express-rate-limit` on auth routes (15 req/hr) |
+| Socket flooding | Per-socket rate limiter (20 msg/min) |
+| XSS via error messages | Internal errors sanitized before any client response |
+| postMessage spoofing | Embed script validates `e.origin` against allowedOrigin |
+| Weak secrets | Startup check warns if JWT secrets are default placeholder values |
 
-Token Rotation: Refresh tokens are rotated upon use, and suspected token theft triggers a nuclear revocation of all active sessions for that user.
+---
 
-Helmet.js: Secures Express apps by setting various HTTP headers.
+## 📁 Project Structure
 
-🤝 Contributing
+```
+embedai/
+├── .github/workflows/ci.yml   # GitHub Actions CI
+├── docker-compose.yml
+├── backend/
+│   ├── Dockerfile
+│   ├── .env.example
+│   └── src/
+│       ├── ai/agent.ts          # LangGraph agent, semantic cache, LRU caches
+│       ├── config/
+│       │   ├── db.ts            # MongoDB connection
+│       │   └── logger.ts        # Winston structured logger
+│       ├── controllers/         # Route handlers
+│       ├── middlewares/
+│       │   ├── auth.middleware.ts     # requireAuth, requireBotOwnership
+│       │   ├── rate.middleware.ts     # express-rate-limit configs
+│       │   └── validate.middleware.ts # Zod request validation factory
+│       ├── models/              # Mongoose schemas (9 models)
+│       ├── routes/              # Express router definitions
+│       ├── services/            # Business logic layer (WIP)
+│       ├── sockets/
+│       │   └── chat.socket.ts   # Socket.io handlers with rate limiting
+│       └── server.ts            # App bootstrap, global error handler
+└── frontend/
+    ├── Dockerfile
+    ├── .env.example
+    └── src/
+        ├── components/
+        │   ├── AdminDashboard.tsx  # Full admin UI (7 tabs)
+        │   ├── Auth.tsx            # Login / Register
+        │   └── ChatWidget.tsx      # Embeddable chat UI + voice AI
+        ├── pages/LandingPage.tsx
+        └── utils/api.ts            # fetchWithAuth with silent token refresh
+```
 
-Contributions, issues, and feature requests are welcome! Feel free to check issues page.
+---
 
-📝 License
+## 🤝 Contributing
 
-This project is MIT licensed.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full guide, branch conventions, and PR checklist.
+
+---
+
+## 📝 License
+
+MIT © 2024

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+
 interface ChatWidgetProps {
     botId: string;
     botName?: string;
@@ -43,7 +45,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
         const storedId = localStorage.getItem('embedai_session_id');
         if (storedId) return storedId;
 
-        const newId = 'sess_' + Math.random().toString(36).substring(2, 15);
+        // Use cryptographically secure UUID — Math.random() is predictable and guessable
+        const newId = crypto.randomUUID();
         localStorage.setItem('embedai_session_id', newId);
         return newId;
     });
@@ -58,7 +61,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     }, [welcomeMessage]);
 
     useEffect(() => {
-        socketRef.current = io('http://localhost:5000');
+        socketRef.current = io(SOCKET_URL);
 
         // NEW: Join the specific room for this session so the Admin can direct-message this widget!
         socketRef.current.emit('join_session', sessionId);

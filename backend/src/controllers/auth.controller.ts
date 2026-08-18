@@ -1,14 +1,36 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import User from '../models/user.modal';
-import Tenant from '../models/tenant.model';
-import Bot from '../models/bot.model';
-import RefreshToken, { IRefreshToken } from '../models/refreshtoken.model';
+import crypto from 'crypto';
+import { z } from 'zod';
+import User from '../models/user.model.js';
+import Tenant from '../models/tenant.model.js';
+import Bot from '../models/bot.model.js';
+import RefreshToken, { IRefreshToken } from '../models/refreshtoken.model.js';
 import * as UAParserPackage from 'ua-parser-js';
+
+// --- Input Validation Schemas ---
+export const registerSchema = z.object({
+    email: z.string().email('Invalid email format.'),
+    password: z.string().min(8, 'Password must be at least 8 characters.').max(128, 'Password is too long.'),
+    companyName: z.string().min(1, 'Company name is required.').max(100, 'Company name is too long.')
+});
+
+export const loginSchema = z.object({
+    email: z.string().email('Invalid email format.'),
+    password: z.string().min(1, 'Password is required.')
+});
 
 const getAccessSecret = () => process.env.JWT_ACCESS_SECRET!;
 const getRefreshSecret = () => process.env.JWT_REFRESH_SECRET!;
+
+/**
+ * Hash a refresh token for safe storage in MongoDB.
+ * If the DB is breached, raw token values cannot be reused.
+ */
+const hashToken = (token: string): string => {
+    return crypto.createHmac('sha256', process.env.JWT_REFRESH_SECRET!).update(token).digest('hex');
+};
 
 const setRefreshTokenCookie = (res: Response, token: string) => {
     res.cookie('jwt_refresh', token, {
@@ -19,6 +41,10 @@ const setRefreshTokenCookie = (res: Response, token: string) => {
     });
 };
 
+/**
+ * Extracts and sanitizes IP address from the request.
+ * Trusts X-Forwarded-For only when behind a known proxy (trust proxy enabled in server.ts).
+ */
 const extractDeviceInfo = (req: Request) => {
     const uaHeader = req.headers['user-agent'];
     const uaString = Array.isArray(uaHeader) ? uaHeader[0] : uaHeader || 'Unknown';
@@ -27,33 +53,34 @@ const extractDeviceInfo = (req: Request) => {
     const parser = new UAParser(uaString);
     const result = parser.getResult();
 
-    const rawIp = req.ip || req.headers['x-forwarded-for'] || 'Unknown';
-    let ipAddress = Array.isArray(rawIp) ? rawIp[0] : rawIp;
+    // req.ip is already normalized when trust proxy is set in server.ts
+    let ipAddress = req.ip || 'Unknown';
 
-    if (typeof ipAddress === 'string' && ipAddress.includes(',')) {
-        ipAddress = ipAddress.split(',')[0].trim();
-    }
+    // Remove IPv6 loopback prefix for cleaner display
+    if (ipAddress === '::1') ipAddress = '127.0.0.1';
+    if (ipAddress.startsWith('::ffff:')) ipAddress = ipAddress.replace('::ffff:', '');
 
     return {
-        userAgent: uaString,
-        ipAddress: ipAddress as string,
+        userAgent: uaString.substring(0, 512), // Prevent extremely long UA strings
+        ipAddress,
         deviceType: (result.device?.type || result.os?.name || 'Desktop') as string
     };
 };
 
 export const register = async (req: Request, res: Response): Promise<any> => {
     try {
+        // Input already validated by validate.middleware before reaching here
         const { email, password, companyName } = req.body;
 
-        const existingUser = await User.findOne({ email });
+        const existingUser = await User.findOne({ email: email.toLowerCase() });
         if (existingUser) return res.status(400).json({ error: 'Email is already in use.' });
 
-        const tenant = await Tenant.create({ email, companyName });
-        const salt = await bcrypt.genSalt(10);
+        const tenant = await Tenant.create({ email: email.toLowerCase(), companyName });
+        const salt = await bcrypt.genSalt(12); // 12 rounds for production strength
         const passwordHash = await bcrypt.hash(password, salt);
 
         await User.create({
-            email,
+            email: email.toLowerCase(),
             passwordHash,
             tenantId: tenant._id
         });
@@ -62,14 +89,13 @@ export const register = async (req: Request, res: Response): Promise<any> => {
             tenantId: tenant._id,
             name: `${companyName} Support Agent`,
             llmProvider: 'GEMINI',
-            llmModel: 'gemini-3.6-flash',
+            llmModel: 'gemini-2.0-flash',
             systemPrompt: `You are a helpful customer support agent for ${companyName}. Answer questions based only on the provided knowledge base.`,
             welcomeMessage: `Hi there! Welcome to ${companyName}. How can I help you today?`,
             colorHex: '#0b57d0'
         });
 
-
-        return res.status(201).json({ message: 'User registered successfully. Please log in.' });
+        return res.status(201).json({ message: 'Account created successfully. Please log in.' });
     } catch (error: any) {
         console.error('Registration Error:', error);
         return res.status(500).json({ error: 'Server error during registration.' });
@@ -80,12 +106,13 @@ export const login = async (req: Request, res: Response): Promise<any> => {
     try {
         const { email, password } = req.body;
 
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: email.toLowerCase() });
         if (!user) return res.status(401).json({ error: 'Invalid credentials.' });
 
         const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) return res.status(401).json({ error: 'Invalid credentials.' });
 
+        // Enforce max concurrent sessions — evict oldest if at limit
         const MAX_SESSIONS = 5;
         const activeSessionsCount = await RefreshToken.countDocuments({ userId: user._id, revoked: false });
 
@@ -110,9 +137,11 @@ export const login = async (req: Request, res: Response): Promise<any> => {
         );
 
         const deviceInfo = extractDeviceInfo(req);
+
+        // Store only the HASH of the refresh token in DB
         await RefreshToken.create({
             userId: user._id,
-            token: refreshToken,
+            token: hashToken(refreshToken),
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             deviceInfo
         });
@@ -138,24 +167,27 @@ export const refreshTokens = async (req: Request, res: Response): Promise<any> =
     }
 
     const currentRefreshToken = cookies.jwt_refresh;
-    res.clearCookie('jwt_refresh', { httpOnly: true, secure: true, sameSite: 'strict' });
+    res.clearCookie('jwt_refresh', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' });
 
     try {
-        const foundToken = await RefreshToken.findOne({ token: currentRefreshToken });
+        // Verify the JWT signature first (catches expired/tampered tokens)
+        const decoded: any = jwt.verify(currentRefreshToken, getRefreshSecret());
+
+        // Look up by the HASH of the submitted token
+        const hashedToken = hashToken(currentRefreshToken);
+        const foundToken = await RefreshToken.findOne({ token: hashedToken });
 
         if (!foundToken || foundToken.revoked) {
-            try {
-                const decoded: any = jwt.verify(currentRefreshToken, getRefreshSecret());
-                console.warn(`🚨 BREACH DETECTED for User ${decoded.userId}. Revoking ALL tokens.`);
-                await RefreshToken.updateMany({ userId: decoded.userId }, { $set: { revoked: true } });
-            } catch (err) { }
-            return res.status(403).json({ error: 'Security breach detected. Please log in again.' });
+            // Token reuse detected — nuclear revocation of ALL sessions for this user
+            console.warn(`🚨 REFRESH TOKEN REUSE DETECTED for User ${decoded.userId}. Revoking ALL sessions.`);
+            await RefreshToken.updateMany({ userId: decoded.userId }, { $set: { revoked: true } });
+            return res.status(403).json({ error: 'Security alert: Session reuse detected. Please log in again.' });
         }
 
-        const decoded: any = jwt.verify(currentRefreshToken, getRefreshSecret());
         const user = await User.findById(decoded.userId);
         if (!user) return res.status(401).json({ error: 'User not found.' });
 
+        // Rotate: revoke old token, issue fresh pair
         foundToken.revoked = true;
         await foundToken.save();
 
@@ -173,7 +205,7 @@ export const refreshTokens = async (req: Request, res: Response): Promise<any> =
 
         await RefreshToken.create({
             userId: user._id,
-            token: newRefreshToken,
+            token: hashToken(newRefreshToken),
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             deviceInfo: foundToken.deviceInfo
         });
@@ -192,12 +224,12 @@ export const logout = async (req: Request, res: Response): Promise<any> => {
     if (!cookies?.jwt_refresh) return res.sendStatus(204);
 
     const refreshToken = cookies.jwt_refresh;
-    await RefreshToken.findOneAndUpdate({ token: refreshToken }, { revoked: true });
-    res.clearCookie('jwt_refresh', { httpOnly: true, secure: true, sameSite: 'strict' });
+    const hashedToken = hashToken(refreshToken);
+    await RefreshToken.findOneAndUpdate({ token: hashedToken }, { revoked: true });
+    res.clearCookie('jwt_refresh', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' });
 
     return res.status(200).json({ message: 'Logged out successfully.' });
 };
-
 
 export const getActiveSessions = async (req: any, res: Response): Promise<any> => {
     try {
@@ -208,7 +240,8 @@ export const getActiveSessions = async (req: any, res: Response): Promise<any> =
 
         let currentSessionId = null;
         if (currentRefreshToken) {
-            const currentSession = await RefreshToken.findOne({ token: currentRefreshToken });
+            const hashedToken = hashToken(currentRefreshToken);
+            const currentSession = await RefreshToken.findOne({ token: hashedToken });
             if (currentSession) currentSessionId = currentSession._id.toString();
         }
 
@@ -231,10 +264,10 @@ export const revokeSession = async (req: any, res: Response): Promise<any> => {
         const userId = req.user.userId;
         const sessionIdToRevoke = req.params.sessionId;
 
-        const result = await RefreshToken.findOneAndUpdate({
-            _id: sessionIdToRevoke,
-            userId
-        }, { revoked: true });
+        const result = await RefreshToken.findOneAndUpdate(
+            { _id: sessionIdToRevoke, userId },
+            { revoked: true }
+        );
 
         if (!result) {
             return res.status(404).json({ error: 'Session not found or already deleted.' });

@@ -1,0 +1,47 @@
+version: '3.9'
+
+# ============================================================
+# EmbedAI — Docker Compose (Local Development & Production)
+# ============================================================
+# Usage:
+#   cp backend/.env.example backend/.env      # fill in real values
+#   cp frontend/.env.example frontend/.env.local
+#   docker compose up --build
+# ============================================================
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: embedai-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      - NODE_ENV=production
+      - FRONTEND_URL=http://localhost:80
+      - ALLOWED_ORIGINS=http://localhost:80,http://localhost:5173
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5000
+        VITE_SOCKET_URL: http://localhost:5000
+    container_name: embedai-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy

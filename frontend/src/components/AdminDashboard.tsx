@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { fetchWithAuth } from '../utils/api';
+import { fetchWithAuth, API_URL } from '../utils/api';
 
 interface AdminDashboardProps {
     botId: string;
@@ -51,7 +51,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const fetchConversations = () => {
-        fetch(`http://localhost:5000/api/conversations/${botId}`)
+        fetch(`${API_URL}/api/conversations/${botId}`)
             .then(res => res.json())
             .then(data => setConversations(data))
             .catch(err => console.error("Failed to fetch conversations", err));
@@ -63,14 +63,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
             fetchConversations();
             interval = setInterval(fetchConversations, 3000);
         } else if (activeTab === 'analytics') {
-            fetch(`http://localhost:5000/api/bots/${botId}/analytics`)
+            fetch(`${API_URL}/api/bots/${botId}/analytics`)
                 .then(res => res.json())
                 .then(data => setAnalyticsData(data))
                 .catch(err => console.error("Failed to fetch analytics", err));
         } else if (activeTab === 'knowledge') {
             fetchKnowledgeSources();
         } else if (activeTab === 'leads') {
-            fetch(`http://localhost:5000/api/leads/${botId}`)
+            fetch(`${API_URL}/api/leads/${botId}`)
                 .then(res => res.json())
                 .then(data => setLeads(data))
                 .catch(err => console.error("Failed to fetch leads", err));
@@ -84,7 +84,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     const fetchSessions = async () => {
         setIsLoadingSessions(true);
         try {
-            const res = await fetchWithAuth('http://localhost:5000/api/auth/sessions');
+            const res = await fetchWithAuth('${API_URL}/api/auth/sessions');
             if (res.ok) {
                 const data = await res.json();
                 setSessions(data);
@@ -99,7 +99,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     const handleRevokeSession = async (sessionId: string) => {
         if (!window.confirm("Are you sure you want to log out of that device?")) return;
         try {
-            const res = await fetchWithAuth(`http://localhost:5000/api/auth/sessions/${sessionId}`, {
+            const res = await fetchWithAuth(`${API_URL}/api/auth/sessions/${sessionId}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
@@ -119,7 +119,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     const fetchKnowledgeSources = async () => {
         setIsLoadingSources(true);
         try {
-            const res = await fetch(`http://localhost:5000/api/knowledge/${botId}`);
+            const res = await fetch(`${API_URL}/api/knowledge/${botId}`);
             const data = await res.json();
             if (res.ok) setKnowledgeSources(data);
         } catch (err) {
@@ -132,7 +132,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     useEffect(() => {
         const fetchBotConfig = async () => {
             try {
-                const response = await fetch(`http://localhost:5000/api/bots/${botId}`);
+                const response = await fetch(`${API_URL}/api/bots/${botId}`);
                 const data = await response.json();
 
                 if (response.ok) {
@@ -185,7 +185,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
         formData.append('botId', botId);
 
         try {
-            const response = await fetch(`http://localhost:5000/api/knowledge/upload`, {
+            const response = await fetch(`${API_URL}/api/knowledge/upload`, {
                 method: 'POST',
                 body: formData,
             });
@@ -209,7 +209,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     const handleDeleteSource = async (sourceId: string) => {
         if (!window.confirm("Are you sure you want to delete this document?")) return;
         try {
-            const res = await fetch(`http://localhost:5000/api/knowledge/${sourceId}`, { method: 'DELETE' });
+            const res = await fetch(`${API_URL}/api/knowledge/${sourceId}`, { method: 'DELETE' });
             if (res.ok) setKnowledgeSources(prev => prev.filter(s => s._id !== sourceId));
         } catch (err) {
             console.error("Failed to delete source:", err);
@@ -220,7 +220,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
         setIsSaving(true);
         setSaveStatus(null);
         try {
-            const response = await fetch(`http://localhost:5000/api/bots/${botId}`, {
+            const response = await fetch(`${API_URL}/api/bots/${botId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -265,7 +265,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
 
     const handleTakeOver = async (sessionId: string) => {
         try {
-            await fetch(`http://localhost:5000/api/conversations/${sessionId}/takeover`, { method: 'POST' });
+            await fetch(`${API_URL}/api/conversations/${sessionId}/takeover`, { method: 'POST' });
             fetchConversations();
         } catch (error) {
             console.error("Failed to take over chat", error);
@@ -284,7 +284,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
         ));
 
         try {
-            await fetch(`http://localhost:5000/api/conversations/${selectedSessionId}/reply`, {
+            await fetch(`${API_URL}/api/conversations/${selectedSessionId}/reply`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: msg })
@@ -560,12 +560,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                     <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                                     <div className="w-3 h-3 rounded-full bg-green-500"></div>
                                 </div>
-                                <button onClick={() => navigator.clipboard.writeText(`<script src="http://localhost:5000/api/bots/embed/${botId}"></script>`)} className="text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded transition-colors">
+                                <button onClick={() => navigator.clipboard.writeText(`<script src="${API_URL}/api/bots/embed/${botId}"></script>`)} className="text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded transition-colors">
                                     Copy Code
                                 </button>
                             </div>
                             <div className="p-6 overflow-x-auto">
-                                <pre className="text-sm font-mono text-emerald-400"><code>&lt;script src="http://localhost:5000/api/bots/embed/{botId}"&gt;&lt;/script&gt;</code></pre>
+                                <pre className="text-sm font-mono text-emerald-400"><code>&lt;script src="${API_URL}/api/bots/embed/{botId}"&gt;&lt;/script&gt;</code></pre>
                             </div>
                         </div>
                     </div>

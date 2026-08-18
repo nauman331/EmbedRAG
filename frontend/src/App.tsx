@@ -4,7 +4,7 @@ import { ChatWidget } from './components/ChatWidget';
 import { AdminDashboard } from './components/AdminDashboard';
 import { Auth } from './components/Auth';
 import { LandingPage } from './pages/LandingPage';
-import { setAccessToken, fetchWithAuth } from './utils/api';
+import { setAccessToken, fetchWithAuth, API_URL } from './utils/api';
 
 const App: React.FC = () => {
   const navigate = useNavigate();
@@ -37,7 +37,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const attemptSilentLogin = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/auth/refresh', {
+        const res = await fetch(`${API_URL}/api/auth/refresh`, {
           method: 'POST',
           credentials: 'include'
         });
@@ -70,7 +70,7 @@ const App: React.FC = () => {
     if (!activeBotId) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/bots/${activeBotId}`);
+      const response = await fetch(`${API_URL}/api/bots/${activeBotId}`);
       if (response.ok) {
         const data = await response.json();
         setBotConfig({
@@ -92,7 +92,7 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch('http://localhost:5000/api/auth/logout', {
+      await fetch(`${API_URL}/api/auth/logout`, {
         method: 'POST',
         credentials: 'include'
       });

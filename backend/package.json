@@ -1,12 +1,13 @@
 {
-  "name": "backend",
+  "name": "embedai-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "EmbedAI — Production-grade multi-tenant AI customer support backend",
+  "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "lint": "eslint src --ext .ts"
   },
   "keywords": [],
   "author": "",
@@ -36,6 +37,7 @@
     "pdf-parse": "^2.4.5",
     "socket.io": "^4.8.3",
     "ua-parser-js": "^2.0.10",
+    "winston": "^3.19.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -7,25 +7,61 @@ import { z } from 'zod';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { MemorySaver } from '@langchain/langgraph';
+// TODO: Upgrade to MongoDBSaver for persistent cross-worker memory:
+// npm install @langchain/langgraph-checkpoint-mongodb
+// import { MongoDBSaver } from '@langchain/langgraph-checkpoint-mongodb';
 import mongoose from 'mongoose';
-import Bot from '../models/bot.model';
-import Tenant from '../models/tenant.model';
-import SemanticCache from '../models/semanticcache.model';
-import Lead from '../models/lead.model';
+import Bot from '../models/bot.model.js';
+import Tenant from '../models/tenant.model.js';
+import SemanticCache from '../models/semanticcache.model.js';
+import Lead from '../models/lead.model.js';
+import logger from '../config/logger.js';
 
+// --- LRU-style bounded caches to prevent memory leaks ---
+const MAX_CACHE_SIZE = 100;
 
-const checkpointer = new MemorySaver();
-const embeddingCache = new Map<string, GoogleGenerativeAIEmbeddings>();
-const llmCache = new Map<string, any>();
+class LRUCache<K, V> extends Map<K, V> {
+    private maxSize: number;
+
+    constructor(maxSize: number) {
+        super();
+        this.maxSize = maxSize;
+    }
+
+    set(key: K, value: V): this {
+        // Evict oldest entry if at capacity
+        if (this.size >= this.maxSize) {
+            const firstKey = this.keys().next().value;
+            if (firstKey !== undefined) this.delete(firstKey);
+        }
+        return super.set(key, value);
+    }
+}
+
+const embeddingCache = new LRUCache<string, GoogleGenerativeAIEmbeddings>(MAX_CACHE_SIZE);
+const llmCache = new LRUCache<string, any>(MAX_CACHE_SIZE);
 
 const getEmbeddings = (apiKey: string) => {
     if (!embeddingCache.has(apiKey)) {
         embeddingCache.set(apiKey, new GoogleGenerativeAIEmbeddings({
-            apiKey: apiKey,
+            apiKey,
             model: process.env.EMBEDDING_MODEL,
         }));
     }
     return embeddingCache.get(apiKey)!;
+};
+
+/**
+ * Sanitize a string to prevent prompt injection from being stored in SemanticCache
+ * or being passed as part of system context.
+ */
+const sanitizeForCache = (text: string): string => {
+    // Remove common prompt injection patterns
+    return text
+        .replace(/\bignore\s+(all\s+)?previous\s+instructions?\b/gi, '[redacted]')
+        .replace(/\bsystem\s+prompt\b/gi, '[redacted]')
+        .replace(/<\/?script[^>]*>/gi, '') // Strip any HTML script tags
+        .substring(0, 2000); // Cap length to prevent extremely long cache entries
 };
 
 export const generateBotResponse = async (botId: string, userMessage: string, sessionId: string) => {
@@ -36,8 +72,8 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
     if (!tenant) throw new Error('Tenant not found.');
 
     const geminiKey = tenant.apiKeys?.gemini || process.env.GEMINI_API_KEY || '';
-    if (!geminiKey || geminiKey.includes('put_your')) {
-        throw new Error('⚠️ Please add a valid Gemini API Key in your dashboard.');
+    if (!geminiKey || geminiKey.includes('put_your') || geminiKey.includes('****')) {
+        throw new Error('⚠️ Please add a valid Gemini API Key in your dashboard settings.');
     }
 
     try {
@@ -45,6 +81,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
 
         const questionEmbedding = await embeddings.embedQuery(userMessage);
 
+        // --- Semantic Cache Check ---
         const cachedResults = await SemanticCache.aggregate([
             {
                 $vectorSearch: {
@@ -56,16 +93,16 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
                     filter: { botId: new mongoose.Types.ObjectId(botId) }
                 }
             },
-            { $project: { answer: 1, score: { $meta: "vectorSearchScore" } } }
+            { $project: { answer: 1, score: { $meta: 'vectorSearchScore' } } }
         ]);
 
         if (cachedResults.length > 0 && cachedResults[0].score > 0.95) {
-            console.log(`⚡ CACHE HIT! (Score: ${cachedResults[0].score}). Saving LLM costs.`);
-            async function* generateCachedChunks() { yield "⚡ " + cachedResults[0].answer; }
+            logger.info(`⚡ CACHE HIT (Score: ${cachedResults[0].score.toFixed(3)}) for bot ${botId}`);
+            async function* generateCachedChunks() { yield '⚡ ' + cachedResults[0].answer; }
             return generateCachedChunks();
         }
 
-        console.log(`🐢 CACHE MISS. Booting up LangGraph Agent...`);
+        logger.debug(`🐢 CACHE MISS — Invoking LangGraph Agent for bot ${botId}`);
 
         if (!mongoose.connection.db) throw new Error('MongoDB not connected.');
         const collection = mongoose.connection.db.collection('documentchunks');
@@ -81,8 +118,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
 
         const searchKnowledgeBaseTool = tool(
             async ({ query, expandedQueries }) => {
-                console.log(`\n🔍 [RAG TOOL] Original: "${query}"`);
-                console.log(`   ↳ Expanded Search: ${expandedQueries.join(', ')}`);
+                logger.debug(`[RAG TOOL] Searching: "${query}" + ${expandedQueries.length} variants`);
 
                 const allResults = await Promise.all([
                     retriever.invoke(query),
@@ -93,7 +129,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
                 allResults.flat().forEach(doc => uniqueDocs.set(doc.pageContent, doc));
 
                 const finalDocs = Array.from(uniqueDocs.values());
-                if (finalDocs.length === 0) return "No relevant information found in the knowledge base.";
+                if (finalDocs.length === 0) return 'No relevant information found in the knowledge base.';
                 return finalDocs.map(doc => doc.pageContent).join('\n\n');
             },
             {
@@ -101,14 +137,14 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
                 description: 'Search the company knowledge base. You MUST provide the original query AND 2 alternate phrasing variations to ensure a match.',
                 schema: z.object({
                     query: z.string(),
-                    expandedQueries: z.array(z.string()).describe("Provide 2-3 alternate ways to ask this question to broaden the search.")
+                    expandedQueries: z.array(z.string()).describe('Provide 2-3 alternate ways to ask this question to broaden the search.')
                 })
             }
         );
 
         const captureLeadTool = tool(
             async ({ name, email }) => {
-                console.log(`\n✅ [LEAD TOOL] Saving ${name} (${email})`);
+                logger.info(`[LEAD TOOL] Capturing lead: ${name} <${email}> for bot ${botId}`);
                 await Lead.create({ botId: new mongoose.Types.ObjectId(botId), name, email });
                 return `Successfully saved lead. Inform the user that a human agent will contact them at ${email} shortly.`;
             },
@@ -119,6 +155,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
             }
         );
 
+        // --- LLM Selection ---
         let llmKey = '';
         if (bot.llmProvider === 'GEMINI') llmKey = geminiKey;
         else if (bot.llmProvider === 'OPENAI') llmKey = tenant.apiKeys?.openai || process.env.OPENAI_API_KEY || '';
@@ -139,8 +176,12 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
             llmCache.set(cacheKey, llm);
         }
 
+        // Use MemorySaver for development. For production multi-instance deployments,
+        // install @langchain/langgraph-checkpoint-mongodb and use MongoDBSaver instead.
+        const checkpointer = new MemorySaver();
+
         const agent = createReactAgent({
-            llm: llm,
+            llm,
             tools: [searchKnowledgeBaseTool, captureLeadTool],
             checkpointSaver: checkpointer,
         });
@@ -152,13 +193,13 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
 
         const config = { configurable: { thread_id: sessionId } };
 
-        const eventStream = await agent.streamEvents({ messages: finalMessages }, { ...config, version: "v2" });
+        const eventStream = await agent.streamEvents({ messages: finalMessages }, { ...config, version: 'v2' });
 
         async function* generateTextChunks() {
             let fullAgentResponse = '';
             for await (const event of eventStream) {
                 const chunkContent = event?.data?.chunk?.content || event?.data?.chunk?.text;
-                if (event.event === "on_chat_model_stream" && chunkContent) {
+                if (event.event === 'on_chat_model_stream' && chunkContent) {
                     if (Array.isArray(chunkContent)) {
                         for (const block of chunkContent) {
                             if (block.type === 'text') {
@@ -173,11 +214,15 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
                 }
             }
 
+            // Store sanitized response in SemanticCache for future hits
             if (fullAgentResponse.trim() !== '') {
+                const sanitizedQuestion = sanitizeForCache(userMessage);
+                const sanitizedAnswer = sanitizeForCache(fullAgentResponse);
+
                 await SemanticCache.create({
                     botId: new mongoose.Types.ObjectId(botId),
-                    question: userMessage,
-                    answer: fullAgentResponse,
+                    question: sanitizedQuestion,
+                    answer: sanitizedAnswer,
                     embedding: questionEmbedding
                 });
             }
@@ -186,7 +231,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
         return generateTextChunks();
 
     } catch (error: any) {
-        console.error(`🚨 ERROR DETAILS:`, error);
+        logger.error({ message: 'LangGraph Agent error', botId, error: error.message });
         throw error;
     }
 };

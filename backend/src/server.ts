@@ -1,160 +1,151 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import express, { type Request, type Response } from 'express';
+
+import express, { type Request, type Response, type NextFunction } from 'express';
 import http from 'http';
 import cors from 'cors';
-import { Server, Socket } from 'socket.io';
+import { Server } from 'socket.io';
 import { connectDB } from './config/db.js';
-import knowledgeRoutes from './routes/knowledge.route';
-import botRoutes from './routes/bot.route';
-import { generateBotResponse } from './ai/agent.js';
-import Conversation from "./models/conversation.model"
-import mongoose from 'mongoose';
+import logger from './config/logger.js';
+import knowledgeRoutes from './routes/knowledge.route.js';
+import botRoutes from './routes/bot.route.js';
+import authRoutes from './routes/auth.route.js';
+import conversationRoutes from './routes/conversation.route.js';
+import leadRoutes from './routes/lead.routes.js';
+import { apiLimiter, aiOperationLimiter } from './middlewares/rate.middleware.js';
+import { initSocketHandlers } from './sockets/chat.socket.js';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import authRoutes from './routes/auth.route';
-import conversationRoutes from './routes/conversation.route';
-import leadRoutes from './routes/lead.routes';
-import { apiLimiter, aiOperationLimiter } from './middlewares/rate.middleware';
 
-const app = express();
-app.use(cookieParser());
-app.use(helmet());
-app.set('trust proxy', 1);
+// --- Environment validation on startup ---
+const REQUIRED_ENV_VARS = [
+    'PORT', 'FRONTEND_URL', 'MONGO_URI',
+    'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'
+];
 
-connectDB();
-
-if (!process.env.PORT || !process.env.FRONTEND_URL) {
-    throw new Error('One or more required environment variables are not defined');
+for (const varName of REQUIRED_ENV_VARS) {
+    if (!process.env[varName]) {
+        logger.error(`FATAL: Required environment variable "${varName}" is not set. Exiting.`);
+        process.exit(1);
+    }
 }
 
-const port = process.env.PORT;
+// Warn about weak defaults (common mistake when copying from .env.example)
+if (
+    process.env.JWT_ACCESS_SECRET === 'super_secret_access_key' ||
+    process.env.JWT_REFRESH_SECRET === 'super_secret_refresh_key'
+) {
+    logger.warn('⚠️  WARNING: JWT secrets are using insecure default values. Generate strong secrets with: openssl rand -hex 64');
+}
 
-const server = http.createServer(app);
+const app = express();
+
+// --- Security middleware ---
+app.use(helmet());
+app.use(cookieParser());
+app.set('trust proxy', 1); // Trust first proxy (required for correct IP extraction behind load balancers)
+
+// --- CORS ---
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
 
 app.use(cors({
-    origin: process.env.FRONTEND_URL,
+    origin: (origin, callback) => {
+        // Allow requests with no origin (server-to-server, health checks)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error(`CORS: Origin ${origin} not allowed.`));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true
 }));
 
-app.use(express.json());
+// --- Body parsing with size limit (prevents JSON payload DoS) ---
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// --- Connect to Database ---
+connectDB();
+
+const port = process.env.PORT || 5000;
+const server = http.createServer(app);
+
+// --- Rate Limiting ---
 app.use('/api', apiLimiter);
 
+// --- API Routes ---
 app.use('/api/auth', authRoutes);
 app.use('/api/knowledge', aiOperationLimiter, knowledgeRoutes);
 app.use('/api/bots', botRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/leads', leadRoutes);
 
+// --- Health Check ---
+app.get('/api/health', async (_req: Request, res: Response) => {
+    const { connection } = await import('mongoose');
+    const dbStatus = connection.readyState === 1 ? 'connected' : 'disconnected';
+    const uptime = process.uptime();
+    const memMB = Math.round(process.memoryUsage().rss / 1024 / 1024);
+
+    res.status(200).json({
+        status: 'ok',
+        version: process.env.npm_package_version || '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        db: dbStatus,
+        uptime: `${Math.floor(uptime / 60)}m ${Math.floor(uptime % 60)}s`,
+        memory: `${memMB} MB`
+    });
+});
+
+// --- Socket.io ---
 const io = new Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL,
+        origin: allowedOrigins,
         methods: ['GET', 'POST'],
         credentials: true
     }
 });
 
-
+// Make io accessible in controllers (for HTTP-triggered socket emissions)
 app.set('io', io);
 
-io.on('connection', (socket: Socket) => {
-    console.log(`⚡ [Socket connected]: Client ID ${socket.id}`);
+// Initialize all socket handlers
+initSocketHandlers(io);
 
-    socket.on('join_session', (sessionId: string) => {
-        socket.join(sessionId);
-        console.log(`User joined session room: ${sessionId}`);
-    });
+// --- Global Error Handler (must be last middleware) ---
+// Catches any errors thrown by route handlers or middleware
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+    logger.error({ message: 'Unhandled error', error: err.message, stack: err.stack });
 
-    socket.on('chat_message', async (data: { botId: string, message: string, history: any[], sessionId: string }) => {
-        console.log(`💬 Received message for Bot ${data.botId}: "${data.message}"`);
-        const { botId, sessionId, message, history } = data;
+    // CORS errors
+    if (err.message?.startsWith('CORS:')) {
+        return res.status(403).json({ error: 'Cross-origin request blocked.' });
+    }
 
-        socket.join(sessionId);
+    // Don't leak internal error details in production
+    const message = process.env.NODE_ENV === 'production'
+        ? 'An unexpected error occurred. Please try again.'
+        : err.message;
 
-        try {
-            const botObjectId = new mongoose.Types.ObjectId(botId);
-
-            let convo = await Conversation.findOne({ botId: botObjectId, sessionId });
-            if (!convo) {
-                convo = await Conversation.create({ botId: botObjectId, sessionId, messages: [] });
-            }
-
-            convo.messages.push({ role: 'user', content: message, createdAt: new Date() } as any);
-            await convo.save();
-
-            if (convo.isHumanHandoff) {
-                console.log(`⏸️ AI Skipped. Human is handling session: ${sessionId}`);
-                const autoReply = "*(System: Your message has been sent to our live team. A human agent will reply shortly.)*";
-
-                convo.messages.push({ role: 'bot', content: autoReply, createdAt: new Date() } as any);
-                await convo.save();
-
-                io.to(sessionId).emit('bot_response_chunk', { chunk: autoReply });
-                io.to(sessionId).emit('bot_response_done');
-                return;
-            }
-
-            const stream = await generateBotResponse(data.botId, data.message, data.sessionId);
-            let fullBotResponse = '';
-
-            for await (const chunk of stream) {
-                fullBotResponse += chunk;
-                io.to(sessionId).emit('bot_response_chunk', { chunk });
-            }
-
-            if (fullBotResponse && fullBotResponse.trim() !== '') {
-                convo.messages.push({ role: 'bot', content: fullBotResponse, createdAt: new Date() } as any);
-                await convo.save();
-            }
-
-            io.to(sessionId).emit('bot_response_done');
-
-        } catch (error: any) {
-            console.error('Error generating bot response:', error);
-            io.to(data.sessionId).emit('bot_error', {
-                error: error.message || 'I encountered an error while thinking. Please try again.'
-            });
-        }
-    });
-
-    socket.on('admin_chat_message', async (data: { botId: string, message: string, sessionId: string }) => {
-        console.log(`👨‍💼 Admin sent message for Bot ${data.botId}: "${data.message}"`);
-        const { botId, sessionId, message } = data;
-
-        try {
-            const botObjectId = new mongoose.Types.ObjectId(botId);
-
-            let convo = await Conversation.findOne({ botId: botObjectId, sessionId });
-            if (!convo) {
-                console.warn(`Admin tried to reply to a non-existent conversation: ${sessionId}`);
-                return;
-            }
-
-            convo.messages.push({ role: 'admin', content: message, createdAt: new Date() } as any);
-            await convo.save();
-
-            io.to(sessionId).emit('bot_response_chunk', { chunk: message });
-            io.to(sessionId).emit('bot_response_done');
-
-        } catch (error: any) {
-            console.error('Error sending admin response:', error);
-            socket.emit('admin_error', {
-                error: error.message || 'Encountered an error sending the message.'
-            });
-        }
-    });
-
-    socket.on('disconnect', () => {
-        console.log(`🔌 [Socket disconnected]: Client ID ${socket.id}`);
-    });
+    res.status(500).json({ error: message });
 });
 
-app.get('/api/health', (req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', message: 'Embed RAG Backend is running.' });
+// --- Handle unhandled promise rejections (prevent silent crashes) ---
+process.on('unhandledRejection', (reason) => {
+    logger.error({ message: 'Unhandled Promise Rejection', reason });
+});
+
+process.on('uncaughtException', (error) => {
+    logger.error({ message: 'Uncaught Exception', error: error.message, stack: error.stack });
+    process.exit(1);
 });
 
 server.listen(port, () => {
-    console.log(`[Server]: Backend is running at http://localhost:${port}`);
-    console.log(`[WebSockets]: Socket.io is actively listening for connections.`);
+    logger.info(`🚀 Backend running on port ${port} [${process.env.NODE_ENV || 'development'}]`);
+    logger.info(`🔌 Socket.io initialized and listening`);
+    logger.info(`✅ Allowed origins: ${allowedOrigins.join(', ')}`);
 });

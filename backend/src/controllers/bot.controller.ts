@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
-import Bot from '../models/bot.model';
-import Tenant from '../models/tenant.model';
-import SemanticCache from '../models/semanticcache.model';
-import Conversation from '../models/conversation.model';
-import { AuthRequest } from '../middlewares/auth.middleware';
-
+import Bot from '../models/bot.model.js';
+import Tenant from '../models/tenant.model.js';
+import SemanticCache from '../models/semanticcache.model.js';
+import Conversation from '../models/conversation.model.js';
+import { AuthRequest } from '../middlewares/auth.middleware.js';
+import mongoose from 'mongoose';
 
 export const getWorkspaceBots = async (req: AuthRequest, res: Response): Promise<any> => {
     try {
@@ -17,7 +17,11 @@ export const getWorkspaceBots = async (req: AuthRequest, res: Response): Promise
     }
 };
 
-export const getBotConfig = async (req: Request, res: Response): Promise<any> => {
+/**
+ * Returns the bot config. API keys are NEVER returned — the frontend
+ * should only show masked indicators (e.g. "Key configured ✓").
+ */
+export const getBotConfig = async (req: AuthRequest, res: Response): Promise<any> => {
     try {
         const botId = req.params.id;
         const bot = await Bot.findById(botId);
@@ -27,9 +31,17 @@ export const getBotConfig = async (req: Request, res: Response): Promise<any> =>
         }
 
         const tenant = await Tenant.findById(bot.tenantId);
+
+        // Mask API keys — indicate whether they are configured, never expose the raw value
+        const maskedApiKeys = {
+            openai: tenant?.apiKeys?.openai ? '****configured****' : '',
+            anthropic: tenant?.apiKeys?.anthropic ? '****configured****' : '',
+            gemini: tenant?.apiKeys?.gemini ? '****configured****' : ''
+        };
+
         const responseData = {
             ...bot.toObject(),
-            apiKeys: tenant?.apiKeys || { openai: '', anthropic: '', gemini: '' }
+            apiKeys: maskedApiKeys
         };
 
         return res.status(200).json(responseData);
@@ -39,8 +51,7 @@ export const getBotConfig = async (req: Request, res: Response): Promise<any> =>
     }
 };
 
-
-export const updateBotConfig = async (req: Request, res: Response): Promise<any> => {
+export const updateBotConfig = async (req: AuthRequest, res: Response): Promise<any> => {
     try {
         const botId = req.params.id;
         const {
@@ -70,11 +81,16 @@ export const updateBotConfig = async (req: Request, res: Response): Promise<any>
             return res.status(404).json({ error: 'Bot not found.' });
         }
 
+        // Only update API keys if explicitly provided and non-empty (don't wipe existing keys with masked values)
         if (apiKeys) {
-            await Tenant.findByIdAndUpdate(
-                updatedBot.tenantId,
-                { $set: { apiKeys: apiKeys } }
-            );
+            const keyUpdate: Record<string, string> = {};
+            if (apiKeys.openai && !apiKeys.openai.includes('****')) keyUpdate['apiKeys.openai'] = apiKeys.openai;
+            if (apiKeys.anthropic && !apiKeys.anthropic.includes('****')) keyUpdate['apiKeys.anthropic'] = apiKeys.anthropic;
+            if (apiKeys.gemini && !apiKeys.gemini.includes('****')) keyUpdate['apiKeys.gemini'] = apiKeys.gemini;
+
+            if (Object.keys(keyUpdate).length > 0) {
+                await Tenant.findByIdAndUpdate(updatedBot.tenantId, { $set: keyUpdate });
+            }
         }
 
         return res.status(200).json({
@@ -92,25 +108,26 @@ export const getEmbedScript = async (req: Request, res: Response): Promise<any> 
         const botId = req.params.id;
         const frontendUrl = process.env.FRONTEND_URL;
 
+        // The script validates postMessage origin to prevent cross-origin spoofing
         const script = `
             (function() {
+                var allowedOrigin = '${frontendUrl}';
                 var iframe = document.createElement('iframe');
-                iframe.src = '${frontendUrl}/widget/${botId}';
+                iframe.src = allowedOrigin + '/widget/${botId}';
                 iframe.style.position = 'fixed';
                 iframe.style.bottom = '0';
                 iframe.style.right = '0';
-                
-                // Start closed (small bubble size)
                 iframe.style.width = '100px';
                 iframe.style.height = '100px';
                 iframe.style.border = 'none';
                 iframe.style.zIndex = '999999';
                 iframe.style.backgroundColor = 'transparent';
-                iframe.allowTransparency = 'true';
+                iframe.setAttribute('allowtransparency', 'true');
                 iframe.id = 'embedai-iframe';
-                
-                // Listen for open/close events from the React ChatWidget inside the iframe
+
+                // Validate origin before resizing to prevent postMessage spoofing
                 window.addEventListener('message', function(e) {
+                    if (e.origin !== allowedOrigin) return;
                     if (e.data === 'embedai-open') {
                         iframe.style.width = '420px';
                         iframe.style.height = '700px';
@@ -132,29 +149,56 @@ export const getEmbedScript = async (req: Request, res: Response): Promise<any> 
     }
 };
 
+/**
+ * Returns REAL analytics derived from MongoDB data (not mock values).
+ */
 export const getBotAnalytics = async (req: Request, res: Response): Promise<any> => {
     try {
-        const botId = req.params.id;
+        const botId = String(req.params.id);
+        const botObjectId = new mongoose.Types.ObjectId(botId);
 
-        const cacheHits = await SemanticCache.countDocuments({ botId });
-        const totalConversations = await Conversation.countDocuments({ botId });
+        const [cacheHits, totalConversations, chartData] = await Promise.all([
+            SemanticCache.countDocuments({ botId: botObjectId }),
+            Conversation.countDocuments({ botId: botObjectId }),
+
+            // Real per-day query aggregation for the last 7 days
+            Conversation.aggregate([
+                {
+                    $match: {
+                        botId: botObjectId,
+                        createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+                    }
+                },
+                {
+                    $group: {
+                        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+                        queries: { $sum: { $size: '$messages' } }
+                    }
+                },
+                { $sort: { _id: 1 } }
+            ])
+        ]);
+
+        // Fill in any missing days in the last 7 days with 0
+        const last7Days = Array.from({ length: 7 }).map((_, i) => {
+            const date = new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000);
+            return date.toISOString().split('T')[0];
+        });
+
+        const chartDataMap = new Map<string, number>(chartData.map((d: any) => [d._id as string, d.queries as number]));
+        const formattedChartData = last7Days.map(day => ({
+            day: new Date(day).toLocaleDateString('en-US', { weekday: 'short' }),
+            queries: chartDataMap.get(day) || 0,
+            cacheHits: 0 // Per-day cache hits require a separate aggregation; total shown in stats
+        }));
 
         const savedCost = (cacheHits * 0.002).toFixed(4);
-
-        const chartData = Array.from({ length: 7 }).map((_, i) => {
-            const date = new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000);
-            return {
-                day: date.toLocaleDateString('en-US', { weekday: 'short' }),
-                queries: Math.floor(Math.random() * 50) + 20,
-                cacheHits: Math.floor(Math.random() * 20) + 5
-            };
-        });
 
         return res.status(200).json({
             totalConversations,
             cacheHits,
             savedCost,
-            chartData
+            chartData: formattedChartData
         });
 
     } catch (error) {

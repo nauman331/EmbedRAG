@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { setAccessToken } from '../utils/api';
+import { setAccessToken, API_URL } from '../utils/api';
 
 interface AuthProps {
     onLoginSuccess: (user: any) => void;
@@ -16,6 +16,15 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+
+        // Client-side validation before hitting the server
+        if (!isLogin && companyName.trim().length === 0) {
+            return setError('Company name is required.');
+        }
+        if (password.length < 8) {
+            return setError('Password must be at least 8 characters.');
+        }
+
         setIsLoading(true);
 
         const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
@@ -24,7 +33,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
             : { email, password, companyName };
 
         try {
-            const res = await fetch(`http://localhost:5000${endpoint}`, {
+            const res = await fetch(`${API_URL}${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),

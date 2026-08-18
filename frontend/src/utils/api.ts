@@ -1,3 +1,5 @@
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 let currentAccessToken: string | null = null;
 
 export const setAccessToken = (token: string | null) => {
@@ -7,19 +9,19 @@ export const setAccessToken = (token: string | null) => {
 export const getAccessToken = () => currentAccessToken;
 
 export const fetchWithAuth = async (url: string, options: RequestInit = {}): Promise<Response> => {
-    const headers = {
+    const makeHeaders = (token: string | null) => ({
         ...options.headers,
-        'Authorization': `Bearer ${currentAccessToken}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-    };
+    });
 
-    let response = await fetch(url, { ...options, headers });
+    let response = await fetch(url, { ...options, headers: makeHeaders(currentAccessToken) });
 
     if (response.status === 403) {
         console.log('🔄 Access token expired. Attempting silent refresh...');
 
         try {
-            const refreshRes = await fetch('http://localhost:5000/api/auth/refresh', {
+            const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
                 method: 'POST',
                 credentials: 'include'
             });
@@ -29,15 +31,9 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}): Pro
             }
 
             const data = await refreshRes.json();
-
             setAccessToken(data.accessToken);
-            const newHeaders = {
-                ...options.headers,
-                'Authorization': `Bearer ${data.accessToken}`,
-                'Content-Type': 'application/json'
-            };
 
-            response = await fetch(url, { ...options, headers: newHeaders });
+            response = await fetch(url, { ...options, headers: makeHeaders(data.accessToken) });
 
         } catch (error) {
             console.error('🚨 Silent refresh failed. User must log in again.');
@@ -49,3 +45,5 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}): Pro
 
     return response;
 };
+
+export { API_URL };
