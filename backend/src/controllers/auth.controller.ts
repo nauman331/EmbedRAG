@@ -98,7 +98,7 @@ export const register = async (req: Request, res: Response): Promise<any> => {
             tenantId: tenant._id,
             name: `${companyName} Support Agent`,
             llmProvider: 'GEMINI',
-            llmModel: 'gemini-2.0-flash',
+            llmModel: 'gemini-3.6-flash',
             systemPrompt: `You are a helpful customer support agent for ${companyName}. Answer questions based only on the provided knowledge base.`,
             welcomeMessage: `Hi there! Welcome to ${companyName}. How can I help you today?`,
             colorHex: '#0b57d0'
