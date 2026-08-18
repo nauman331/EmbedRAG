@@ -184,7 +184,14 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
             llm,
             tools: [searchKnowledgeBaseTool, captureLeadTool],
             checkpointSaver: checkpointer,
-            prompt: new SystemMessage(`${bot.systemPrompt}\n\nYou have tools available. Only use 'search_knowledge_base' if you need factual data.`),
+            prompt: (state: any) => {
+                // Filter out any poisoned SystemMessages stored in old checkpoints
+                const filteredMessages = state.messages.filter((msg: any) => msg._getType() !== 'system');
+                return [
+                    new SystemMessage(`${bot.systemPrompt}\n\nYou have tools available. Only use 'search_knowledge_base' if you need factual data.`),
+                    ...filteredMessages
+                ];
+            }
         });
 
         const finalMessages = [
