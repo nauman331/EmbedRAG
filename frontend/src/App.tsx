@@ -31,6 +31,13 @@ const App: React.FC = () => {
         const bots = await res.json();
         if (bots && bots.length > 0) {
           setActiveBotId(bots[0]._id);
+        } else {
+          // If no bots exist, automatically create a default one
+          const createRes = await fetchAuthApi('/api/bots', { method: 'POST' });
+          if (createRes.ok) {
+            const newBot = await createRes.json();
+            setActiveBotId(newBot._id);
+          }
         }
       }
     } catch (err) {

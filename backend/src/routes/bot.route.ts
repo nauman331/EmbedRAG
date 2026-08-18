@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getBotConfig, updateBotConfig, getEmbedScript, getBotAnalytics, getWorkspaceBots } from '../controllers/bot.controller.js';
+import { getBotConfig, updateBotConfig, getEmbedScript, getBotAnalytics, getWorkspaceBots, createWorkspaceBot } from '../controllers/bot.controller.js';
 import { requireAuth, requireBotOwnership } from '../middlewares/auth.middleware.js';
 
 const router = Router();
@@ -9,6 +9,9 @@ router.get('/embed/:id', getEmbedScript);
 
 // Authenticated: List all bots for the logged-in tenant
 router.get('/', requireAuth, getWorkspaceBots);
+
+// Authenticated: Create a new bot for the logged-in tenant
+router.post('/', requireAuth, createWorkspaceBot);
 
 // Authenticated + Ownership: Read, update, and analytics for a specific bot
 router.get('/:id', requireAuth, requireBotOwnership, getBotConfig);

@@ -316,7 +316,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
     };
 
     return (
-        <div className="flex flex-col md:flex-row gap-8 mt-4">
+        <div className="w-full max-w-6xl mx-auto flex gap-6 h-[calc(100vh-8rem)]">
+            {!apiKeys.gemini && (
+                <div className="fixed top-16 left-0 right-0 z-50 bg-red-500 text-white px-4 py-3 text-center shadow-md">
+                    <p className="text-sm font-medium">
+                        ⚠️ <strong>Action Required:</strong> You must configure your Google Gemini API Key in the <button onClick={() => setActiveTab('settings')} className="underline font-bold hover:text-red-100">Settings</button> tab before your chatbot can answer questions.
+                    </p>
+                </div>
+            )}
             <aside className="w-full md:w-64 flex-shrink-0">
                 <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col gap-2">
                     <button
@@ -526,9 +533,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                     </div>
                                 </div>
                                 <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                        {llmProvider === 'GEMINI' ? 'Google AI Studio Key' : llmProvider === 'OPENAI' ? 'OpenAI API Key' : 'Anthropic API Key'}
-                                    </label>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="block text-sm font-semibold text-slate-700">
+                                            {llmProvider === 'GEMINI' ? 'Google AI Studio Key (Required)' : llmProvider === 'OPENAI' ? 'OpenAI API Key (Optional)' : 'Anthropic API Key (Optional)'}
+                                        </label>
+                                        {llmProvider === 'GEMINI' && (
+                                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                                                Get your key here <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                            </a>
+                                        )}
+                                    </div>
                                     <input type="password" value={llmProvider === 'GEMINI' ? apiKeys.gemini : llmProvider === 'OPENAI' ? apiKeys.openai : apiKeys.anthropic} onChange={(e) => setApiKeys({ ...apiKeys, [llmProvider.toLowerCase()]: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 font-mono text-sm" placeholder="sk-..." />
                                 </div>
                             </div>

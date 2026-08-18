@@ -17,6 +17,30 @@ export const getWorkspaceBots = async (req: AuthRequest, res: Response): Promise
     }
 };
 
+export const createWorkspaceBot = async (req: AuthRequest, res: Response): Promise<any> => {
+    try {
+        const tenantId = req.user?.tenantId;
+        const tenant = await Tenant.findById(tenantId);
+        
+        if (!tenant) return res.status(404).json({ error: 'Tenant not found.' });
+
+        const newBot = await Bot.create({
+            tenantId,
+            name: `${tenant.companyName} Support Agent`,
+            llmProvider: 'GEMINI',
+            llmModel: 'gemini-2.0-flash',
+            systemPrompt: `You are a helpful customer support agent for ${tenant.companyName}. Answer questions based only on the provided knowledge base.`,
+            welcomeMessage: `Hi there! Welcome to ${tenant.companyName}. How can I help you today?`,
+            colorHex: '#0b57d0'
+        });
+
+        return res.status(201).json(newBot);
+    } catch (error: any) {
+        console.error('Error creating workspace bot:', error);
+        return res.status(500).json({ error: 'Failed to create bot.' });
+    }
+};
+
 /**
  * Returns the bot config. API keys are NEVER returned — the frontend
  * should only show masked indicators (e.g. "Key configured ✓").
