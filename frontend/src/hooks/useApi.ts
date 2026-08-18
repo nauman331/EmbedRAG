@@ -7,9 +7,9 @@ import { API_URL, fetchWithAuth } from '../utils/api';
  */
 export const useApi = () => {
     const fetchApi = useCallback(async (endpoint: string, options: RequestInit = {}) => {
-        // Ensure endpoint starts with a slash if not provided
+        const baseUrl = (API_URL || '').replace(/\/$/, '');
         const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-        return fetch(`${API_URL}${path}`, options);
+        return fetch(`${baseUrl}${path}`, options);
     }, []);
 
     return fetchApi;
@@ -22,9 +22,9 @@ export const useApi = () => {
  */
 export const useAuthApi = () => {
     const fetchAuthApi = useCallback(async (endpoint: string, options: RequestInit = {}) => {
-        // Ensure endpoint starts with a slash if not provided
+        const baseUrl = (API_URL || '').replace(/\/$/, '');
         const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-        return fetchWithAuth(`${API_URL}${path}`, options);
+        return fetchWithAuth(`${baseUrl}${path}`, options);
     }, []);
 
     return fetchAuthApi;

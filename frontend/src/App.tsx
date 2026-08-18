@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [activeBotId, setActiveBotId] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [hasFetchedBots, setHasFetchedBots] = useState(false);
 
   const [botConfig, setBotConfig] = useState({
     name: 'Support Assistant',
@@ -34,6 +35,8 @@ const App: React.FC = () => {
       }
     } catch (err) {
       console.error("Failed to fetch user bots", err);
+    } finally {
+      setHasFetchedBots(true);
     }
   };
 
@@ -119,9 +122,25 @@ const App: React.FC = () => {
 
   const DashboardLayout = () => {
     if (!activeBotId) {
+      if (!hasFetchedBots) {
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        );
+      }
       return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-          <div className="w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-800">
+          <div className="p-8 bg-white rounded-xl shadow-sm border border-slate-200 text-center max-w-md">
+            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </div>
+            <h2 className="text-xl font-bold mb-2">No Workspace Found</h2>
+            <p className="text-slate-600 mb-6">We couldn't find an active workspace or bot for your account. Please log out and try again, or contact support.</p>
+            <button onClick={handleLogout} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+              Log Out
+            </button>
+          </div>
         </div>
       );
     }
