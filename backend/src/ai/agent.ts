@@ -87,7 +87,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
                     queryVector: questionEmbedding,
                     numCandidates: 10,
                     limit: 1,
-                    filter: { botId: new mongoose.Types.ObjectId(botId) }
+                    filter: { botId: { $eq: new mongoose.Types.ObjectId(botId) } }
                 }
             },
             { $project: { answer: 1, score: { $meta: 'vectorSearchScore' } } }
@@ -111,7 +111,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
             embeddingKey: 'embedding',
         });
 
-        const retriever = vectorStore.asRetriever({ k: 4, filter: { botId: new mongoose.Types.ObjectId(botId) } });
+        const retriever = vectorStore.asRetriever({ k: 4, filter: { preFilter: { botId: { $eq: new mongoose.Types.ObjectId(botId) } } } });
 
         const searchKnowledgeBaseTool = tool(
             async ({ query, expandedQueries }) => {
