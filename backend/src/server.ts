@@ -49,18 +49,27 @@ app.set('trust proxy', 1); // Trust first proxy (required for correct IP extract
 // --- CORS ---
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
     .split(',')
-    .map(o => o.trim().replace(/\/$/, '')) // remove trailing slash
-    .map(o => o.startsWith('http') ? o : `https://${o}`) // ensure protocol is present (Render provides bare host)
+    .map(o => o.trim().replace(/^["']|["']$/g, '').replace(/\/$/, '')) // remove quotes and trailing slash
+    .map(o => o.startsWith('http') ? o : `https://${o}`) // ensure protocol is present
     .filter(Boolean);
 
 app.use(cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (server-to-server, health checks)
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error(`CORS: Origin ${origin} not allowed.`));
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
         }
+
+        // Safe fallback for Render preview environments / misconfigurations
+        if (origin.endsWith('.onrender.com') || origin.startsWith('http://localhost:')) {
+            return callback(null, true);
+        }
+
+        console.error(`🚨 CORS BLOCKED: Origin "${origin}" not in allowed list:`, allowedOrigins);
+        return callback(new Error(`CORS: Origin ${origin} not allowed.`));
+    },
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true
