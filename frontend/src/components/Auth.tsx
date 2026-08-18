@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { setAccessToken, API_URL } from '../utils/api';
+import { setAccessToken } from '../utils/api';
+import { useApi } from '../hooks/useApi';
 
 interface AuthProps {
     onLoginSuccess: (user: any) => void;
 }
 
 export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
+    const fetchApi = useApi();
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -33,7 +35,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
             : { email, password, companyName };
 
         try {
-            const res = await fetch(`${API_URL}${endpoint}`, {
+            const res = await fetchApi(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
