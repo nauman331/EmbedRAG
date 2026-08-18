@@ -49,7 +49,8 @@ app.set('trust proxy', 1); // Trust first proxy (required for correct IP extract
 // --- CORS ---
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
     .split(',')
-    .map(o => o.trim())
+    .map(o => o.trim().replace(/\/$/, '')) // remove trailing slash
+    .map(o => o.startsWith('http') ? o : `https://${o}`) // ensure protocol is present (Render provides bare host)
     .filter(Boolean);
 
 app.use(cors({
