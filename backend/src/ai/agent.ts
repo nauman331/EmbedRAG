@@ -6,10 +6,7 @@ import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { MemorySaver } from '@langchain/langgraph';
-// TODO: Upgrade to MongoDBSaver for persistent cross-worker memory:
-// npm install @langchain/langgraph-checkpoint-mongodb
-// import { MongoDBSaver } from '@langchain/langgraph-checkpoint-mongodb';
+import { MongoDBSaver } from '@langchain/langgraph-checkpoint-mongodb';
 import mongoose from 'mongoose';
 import Bot from '../models/bot.model.js';
 import Tenant from '../models/tenant.model.js';
@@ -176,9 +173,12 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
             llmCache.set(cacheKey, llm);
         }
 
-        // Use MemorySaver for development. For production multi-instance deployments,
-        // install @langchain/langgraph-checkpoint-mongodb and use MongoDBSaver instead.
-        const checkpointer = new MemorySaver();
+        // --- Persistent checkpointer backed by MongoDB (survives restarts, shared across workers) ---
+        const db = mongoose.connection.db;
+        const checkpointer = new MongoDBSaver({
+            client: mongoose.connection.getClient() as any,
+            dbName: db!.databaseName
+        });
 
         const agent = createReactAgent({
             llm,

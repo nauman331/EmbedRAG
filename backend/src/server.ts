@@ -16,6 +16,7 @@ import { apiLimiter, aiOperationLimiter } from './middlewares/rate.middleware.js
 import { initSocketHandlers } from './sockets/chat.socket.js';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import mongoose from 'mongoose';
 
 // --- Environment validation on startup ---
 const REQUIRED_ENV_VARS = [
@@ -86,8 +87,7 @@ app.use('/api/leads', leadRoutes);
 
 // --- Health Check ---
 app.get('/api/health', async (_req: Request, res: Response) => {
-    const { connection } = await import('mongoose');
-    const dbStatus = connection.readyState === 1 ? 'connected' : 'disconnected';
+    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
     const uptime = process.uptime();
     const memMB = Math.round(process.memoryUsage().rss / 1024 / 1024);
 
