@@ -164,7 +164,7 @@ const CacheLedgerDemo: React.FC = () => {
                     {rows.map((row) => (
                         <div key={row.id} className="space-y-2 animate-[fadeIn_0.3s_ease-out]">
                             <div className="flex justify-end">
-                                <div className="bg-blue-600 text-white text-sm px-4 py-2 rounded-2xl rounded-br-sm max-w-[80%]">
+                                <div className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-2xl rounded-br-sm max-w-[80%]">
                                     {row.q}
                                 </div>
                             </div>
@@ -190,7 +190,7 @@ const CacheLedgerDemo: React.FC = () => {
                         </div>
                     ))}
                 </div>
-                <div className="flex items-center justify-between px-4 sm:px-5 py-4 bg-slate-50 border-t border-slate-100">
+                <div className="flex items-center justify-between px-4 sm:px-5 py-4 bg-[#f8fafc] border-t border-slate-100">
                     <div>
                         <p className="text-xs text-slate-400">Answered instantly</p>
                         <p className="text-lg font-bold text-slate-800">{hitRate}%</p>
@@ -299,7 +299,7 @@ const AccordionItem: React.FC<{ q: string; a: string; open: boolean; onToggle: (
                 aria-expanded={open}
                 aria-controls={`${id}-panel`}
                 onClick={onToggle}
-                className="w-full flex items-center justify-between gap-4 py-5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-500 rounded-sm"
+                className="w-full flex items-center justify-between gap-4 py-5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-500 rounded-sm"
             >
                 <span className="text-base sm:text-lg font-semibold text-slate-800">{q}</span>
                 <span className={`shrink-0 text-slate-400 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} aria-hidden="true">
@@ -335,7 +335,7 @@ export const LandingPage: React.FC = () => {
     }, []);
 
     return (
-        <div className="min-h-screen bg-slate-50 font-sans selection:bg-emerald-100 selection:text-emerald-900 flex flex-col">
+        <div className="min-h-screen bg-[#f8fafc] font-sans selection:bg-emerald-100 selection:text-emerald-900 flex flex-col">
             <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
 
             <Helmet>
@@ -349,8 +349,8 @@ export const LandingPage: React.FC = () => {
             {/* ---------------- Header ---------------- */}
             <header className="bg-white/90 backdrop-blur border-b border-slate-200 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <a href="/" className="flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-500 rounded-lg">
-                        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-inner">
+                    <a href="/" className="flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-500 rounded-lg">
+                        <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center shadow-inner">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
                                 <polyline points="2 17 12 22 22 17"></polyline>
@@ -362,19 +362,19 @@ export const LandingPage: React.FC = () => {
 
                     <nav aria-label="Primary" className="hidden md:flex gap-8 font-medium text-slate-600 text-sm">
                         {navLinks.map((l) => (
-                            <a key={l.href} href={l.href} className="hover:text-blue-600 transition-colors">{l.label}</a>
+                            <a key={l.href} href={l.href} className="hover:text-emerald-600 transition-colors">{l.label}</a>
                         ))}
                     </nav>
 
                     <div className="hidden md:flex items-center gap-4">
                         <a href="/login" className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">Log in</a>
-                        <a href="/login" className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-all shadow-md hover:shadow-lg">
+                        <a href="/login" className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-all shadow-md hover:shadow-lg">
                             Get Started
                         </a>
                     </div>
 
                     <button
-                        className="md:hidden text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 rounded-md p-1"
+                        className="md:hidden text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 rounded-md p-1"
                         aria-expanded={mobileOpen}
                         aria-controls="mobile-nav"
                         aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
@@ -394,7 +394,7 @@ export const LandingPage: React.FC = () => {
                                 {l.label}
                             </a>
                         ))}
-                        <a href="/login" onClick={() => setMobileOpen(false)} className="mt-3 text-center bg-blue-600 text-white font-semibold px-5 py-3 rounded-full">
+                        <a href="/login" onClick={() => setMobileOpen(false)} className="mt-3 text-center bg-emerald-600 text-white font-semibold px-5 py-3 rounded-full">
                             Get Started
                         </a>
                     </nav>
@@ -498,7 +498,7 @@ export const LandingPage: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             {featureCards.map((f, i) => (
                                 <FadeIn key={f.title} delay={i * 70}>
-                                    <div className="group bg-slate-50 hover:bg-white p-8 rounded-3xl border border-slate-100 hover:border-slate-200 hover:shadow-lg transition-all duration-300 h-full">
+                                    <div className="group bg-[#f8fafc] hover:bg-white p-8 rounded-3xl border border-slate-100 hover:border-slate-200 hover:shadow-lg transition-all duration-300 h-full">
                                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-6 transition-transform duration-300 group-hover:scale-110 ${toneClasses[f.tone]}`}>
                                             {f.icon}
                                         </div>
@@ -589,7 +589,7 @@ export const LandingPage: React.FC = () => {
                                 aria-checked={annual}
                                 aria-label="Toggle annual pricing"
                                 onClick={() => setAnnual((v) => !v)}
-                                className="relative w-12 h-7 rounded-full bg-slate-900 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                                className="relative w-12 h-7 rounded-full bg-slate-900 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
                             >
                                 <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform duration-200 ${annual ? 'translate-x-5' : 'translate-x-0'}`}></span>
                             </button>
@@ -603,7 +603,7 @@ export const LandingPage: React.FC = () => {
                                 const price = plan.monthly === null ? 'Custom' : `$${annual ? plan.annual : plan.monthly}`;
                                 return (
                                     <FadeIn key={plan.name} delay={i * 90}>
-                                        <div className={`rounded-3xl p-8 flex flex-col h-full transition-transform duration-300 hover:-translate-y-1 ${plan.featured ? 'bg-slate-900 text-white shadow-2xl md:-translate-y-4' : 'bg-slate-50 border border-slate-100 text-slate-900'}`}>
+                                        <div className={`rounded-3xl p-8 flex flex-col h-full transition-transform duration-300 hover:-translate-y-1 ${plan.featured ? 'bg-slate-900 text-white shadow-2xl md:-translate-y-4' : 'bg-[#f8fafc] border border-slate-100 text-slate-900'}`}>
                                             {plan.featured && (
                                                 <span className="self-start bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full mb-4">
                                                     MOST POPULAR
@@ -680,7 +680,7 @@ export const LandingPage: React.FC = () => {
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-10 pb-12 border-b border-slate-800">
                         <div className="col-span-2">
                             <div className="flex items-center gap-2 mb-4">
-                                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                                <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                         <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
                                         <polyline points="2 17 12 22 22 17"></polyline>

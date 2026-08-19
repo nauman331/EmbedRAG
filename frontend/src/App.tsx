@@ -153,32 +153,8 @@ const App: React.FC = () => {
     }
 
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
-        <nav className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-inner">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                <polyline points="2 17 12 22 22 17"></polyline>
-                <polyline points="2 12 12 17 22 12"></polyline>
-              </svg>
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800">EmbedAI</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-sm font-medium text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
-              Workspace: <span className="font-mono text-slate-600">{user?.tenantId ? user.tenantId.substring(0, 6) : '...'}</span>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="text-sm font-semibold text-slate-500 hover:text-red-600 transition-colors px-2 py-1 rounded-md hover:bg-red-50"
-            >
-              Log Out
-            </button>
-          </div>
-        </nav>
-
-        <div className="flex-1 w-full max-w-7xl mx-auto p-6">
+      <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-900">
+        <div className="w-full h-full">
           <AdminDashboard
             botId={activeBotId}
             tenantId={user?.tenantId}
