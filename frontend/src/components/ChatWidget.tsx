@@ -3,6 +3,18 @@ import { io, Socket } from 'socket.io-client';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL;
 
+// Read the allowed parent origin from the URL query param injected by the embed script.
+// Falls back to '*' only when the widget is loaded directly (not via iframe embed).
+const getParentOrigin = (): string => {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const origin = params.get('parentOrigin');
+        return origin ? decodeURIComponent(origin) : '*';
+    } catch {
+        return '*';
+    }
+};
+
 interface ChatWidgetProps {
     botId: string;
     botName?: string;
@@ -122,10 +134,11 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     }, [messages]);
 
     useEffect(() => {
+        const parentOrigin = getParentOrigin();
         if (isOpen) {
-            window.parent.postMessage('embedai-open', '*');
+            window.parent.postMessage('embedai-open', parentOrigin);
         } else {
-            window.parent.postMessage('embedai-close', '*');
+            window.parent.postMessage('embedai-close', parentOrigin);
         }
     }, [isOpen]);
 

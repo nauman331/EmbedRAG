@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { ChatWidget } from './components/ChatWidget';
 import { AdminDashboard } from './components/AdminDashboard';
 import { Auth } from './components/Auth';
@@ -9,7 +9,6 @@ import { useApi, useAuthApi } from './hooks/useApi';
 
 const App: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const fetchApi = useApi();
   const fetchAuthApi = useAuthApi();
 
@@ -171,6 +170,21 @@ const App: React.FC = () => {
     );
   };
 
+  // Proper widget route component using useParams() — not fragile pathname splitting
+  const WidgetRoute = () => {
+    const { botId } = useParams<{ botId: string }>();
+    return (
+      <div className="bg-transparent h-screen w-screen overflow-hidden">
+        <ChatWidget
+          botId={botId || ''}
+          botName={botConfig.name}
+          primaryColor={botConfig.colorHex}
+          welcomeMessage={botConfig.welcomeMessage}
+        />
+      </div>
+    );
+  };
+
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
@@ -193,19 +207,7 @@ const App: React.FC = () => {
         }
       />
 
-      <Route
-        path="/widget/:botId"
-        element={
-          <div className="bg-transparent h-screen w-screen overflow-hidden">
-            <ChatWidget
-              botId={location.pathname.split('/')[2]} // Extract from URL
-              botName={botConfig.name}
-              primaryColor={botConfig.colorHex}
-              welcomeMessage={botConfig.welcomeMessage}
-            />
-          </div>
-        }
-      />
+      <Route path="/widget/:botId" element={<WidgetRoute />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

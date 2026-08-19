@@ -137,7 +137,8 @@ export const getEmbedScript = async (req: Request, res: Response): Promise<any> 
             (function() {
                 var allowedOrigin = '${frontendUrl}';
                 var iframe = document.createElement('iframe');
-                iframe.src = allowedOrigin + '/widget/${botId}';
+                // Pass allowedOrigin as a query param so the widget can target postMessage correctly
+                iframe.src = allowedOrigin + '/widget/${botId}?parentOrigin=' + encodeURIComponent(allowedOrigin);
                 iframe.style.position = 'fixed';
                 iframe.style.bottom = '0';
                 iframe.style.right = '0';

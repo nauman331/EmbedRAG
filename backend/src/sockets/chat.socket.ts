@@ -1,5 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import mongoose from 'mongoose';
+import jwt from 'jsonwebtoken';
 import Conversation from '../models/conversation.model.js';
 import Bot from '../models/bot.model.js';
 import { generateBotResponse } from '../ai/agent.js';
@@ -28,6 +29,22 @@ const isSocketRateLimited = (socketId: string): boolean => {
     entry.count++;
     if (entry.count > MESSAGE_LIMIT) return true;
     return false;
+};
+
+/**
+ * Verifies a JWT Bearer token from a socket event payload.
+ * Returns the decoded payload or null if invalid/expired.
+ */
+const verifySocketToken = (token: string): { userId: string; tenantId: string } | null => {
+    try {
+        const secret = process.env.JWT_ACCESS_SECRET;
+        if (!secret) return null;
+        const decoded = jwt.verify(token, secret) as any;
+        if (!decoded?.userId || !decoded?.tenantId) return null;
+        return { userId: decoded.userId, tenantId: decoded.tenantId };
+    } catch {
+        return null;
+    }
 };
 
 export const initSocketHandlers = (io: Server) => {
@@ -123,20 +140,38 @@ export const initSocketHandlers = (io: Server) => {
         });
 
         // --- Admin reply (from the admin dashboard) ---
-        // Note: Admin socket messages are authenticated via the JWT check in AdminDashboard
-        // For production, add socket JWT middleware here for extra defense-in-depth
-        socket.on('admin_chat_message', async (data: { botId: string; message: string; sessionId: string; adminToken?: string }) => {
-            const { botId, sessionId, message } = data;
+        // JWT token is verified on every admin message — no persistent auth state on the socket.
+        socket.on('admin_chat_message', async (data: { botId: string; message: string; sessionId: string; adminToken: string }) => {
+            const { botId, sessionId, message, adminToken } = data;
+
+            // --- Authenticate the admin token ---
+            if (!adminToken || typeof adminToken !== 'string') {
+                socket.emit('admin_error', { error: 'Unauthorized: No token provided.' });
+                return;
+            }
+
+            const adminUser = verifySocketToken(adminToken);
+            if (!adminUser) {
+                socket.emit('admin_error', { error: 'Unauthorized: Invalid or expired token.' });
+                return;
+            }
 
             // Basic input validation
             if (typeof botId !== 'string' || !mongoose.Types.ObjectId.isValid(botId)) return;
             if (typeof sessionId !== 'string' || sessionId.length > 128) return;
             if (typeof message !== 'string' || message.trim().length === 0 || message.length > 5000) return;
 
-            logger.info(`👨‍💼 admin_chat_message | bot: ${botId} | session: ${sessionId}`);
+            logger.info(`👨‍💼 admin_chat_message | bot: ${botId} | session: ${sessionId} | admin: ${adminUser.userId}`);
 
             try {
                 const botObjectId = new mongoose.Types.ObjectId(botId);
+
+                // Verify the admin's tenant owns this bot
+                const bot = await Bot.findById(botObjectId).lean();
+                if (!bot || bot.tenantId.toString() !== adminUser.tenantId) {
+                    socket.emit('admin_error', { error: 'Unauthorized: Bot not found.' });
+                    return;
+                }
 
                 const convo = await Conversation.findOne({ botId: botObjectId, sessionId });
                 if (!convo) {

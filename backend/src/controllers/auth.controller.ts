@@ -8,6 +8,7 @@ import Tenant from '../models/tenant.model.js';
 import Bot from '../models/bot.model.js';
 import RefreshToken, { IRefreshToken } from '../models/refreshtoken.model.js';
 import * as UAParserPackage from 'ua-parser-js';
+import logger from '../config/logger.js';
 
 // --- Input Validation Schemas ---
 export const registerSchema = z.object({
@@ -106,7 +107,7 @@ export const register = async (req: Request, res: Response): Promise<any> => {
 
         return res.status(201).json({ message: 'Account created successfully. Please log in.' });
     } catch (error: any) {
-        console.error('Registration Error:', error);
+        logger.error({ message: 'Registration error', error: error.message });
         return res.status(500).json({ error: 'Server error during registration.' });
     }
 };
@@ -164,7 +165,7 @@ export const login = async (req: Request, res: Response): Promise<any> => {
         });
 
     } catch (error: any) {
-        console.error('Login Error:', error);
+        logger.error({ message: 'Login error', error: error.message });
         return res.status(500).json({ error: 'Server error during login.' });
     }
 };
@@ -189,7 +190,7 @@ export const refreshTokens = async (req: Request, res: Response): Promise<any> =
 
         if (!foundToken || foundToken.revoked) {
             // Token reuse detected — nuclear revocation of ALL sessions for this user
-            console.warn(`🚨 REFRESH TOKEN REUSE DETECTED for User ${decoded.userId}. Revoking ALL sessions.`);
+            logger.warn(`🚨 REFRESH TOKEN REUSE DETECTED for User ${decoded.userId}. Revoking ALL sessions.`);
             await RefreshToken.updateMany({ userId: decoded.userId }, { $set: { revoked: true } });
             return res.status(403).json({ error: 'Security alert: Session reuse detected. Please log in again.' });
         }

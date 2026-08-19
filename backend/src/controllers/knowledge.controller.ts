@@ -27,6 +27,9 @@ export const upload = multer({
 });
 
 export const uploadKnowledge = async (req: AuthRequest, res: Response): Promise<any> => {
+    // knowledgeSource may be created before the error — hold a reference for cleanup
+    let knowledgeSource: any = null;
+
     try {
         // tenantId comes from the verified JWT — never from user-supplied body
         const tenantId = req.user?.tenantId;
@@ -46,7 +49,7 @@ export const uploadKnowledge = async (req: AuthRequest, res: Response): Promise<
             return res.status(400).json({ error: 'Missing Gemini API Key. Please add it in Dashboard → Settings.' });
         }
 
-        const knowledgeSource = await KnowledgeSource.create({
+        knowledgeSource = await KnowledgeSource.create({
             tenantId,
             botId,
             type: 'PDF',
@@ -99,6 +102,16 @@ export const uploadKnowledge = async (req: AuthRequest, res: Response): Promise<
 
     } catch (error: any) {
         console.error('Error processing knowledge upload:', error);
+
+        // Mark the record as FAILED so it doesn't stay stuck as PROCESSING
+        if (knowledgeSource) {
+            try {
+                knowledgeSource.status = 'FAILED';
+                await knowledgeSource.save();
+            } catch (saveErr) {
+                console.error('Failed to update knowledge source status to FAILED:', saveErr);
+            }
+        }
 
         // Handle Multer file size error
         if (error.code === 'LIMIT_FILE_SIZE') {
