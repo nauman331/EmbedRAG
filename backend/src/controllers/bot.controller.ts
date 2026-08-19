@@ -31,7 +31,7 @@ export const createWorkspaceBot = async (req: AuthRequest, res: Response): Promi
             llmModel: 'gemini-3.6-flash',
             systemPrompt: `You are a helpful customer support agent for ${tenant.companyName}. Answer questions based only on the provided knowledge base.`,
             welcomeMessage: `Hi there! Welcome to ${tenant.companyName}. How can I help you today?`,
-            colorHex: '#0b57d0'
+            colorHex: '#059669'
         });
 
         return res.status(201).json(newBot);

@@ -20,7 +20,7 @@ const App: React.FC = () => {
 
   const [botConfig, setBotConfig] = useState({
     name: 'Support Assistant',
-    colorHex: '#0b57d0',
+    colorHex: '#059669',
     welcomeMessage: 'Hi there! How can I help you today?'
   });
 
@@ -83,12 +83,12 @@ const App: React.FC = () => {
     if (!activeBotId) return;
 
     try {
-      const response = await fetchApi(`/api/bots/${activeBotId}`);
+      const response = await fetchAuthApi(`/api/bots/${activeBotId}`);
       if (response.ok) {
         const data = await response.json();
         setBotConfig({
           name: data.name || 'Support Assistant',
-          colorHex: data.colorHex || '#0b57d0',
+          colorHex: data.colorHex || '#059669',
           welcomeMessage: data.welcomeMessage || 'Hi there! How can I help you today?'
         });
       }

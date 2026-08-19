@@ -101,7 +101,7 @@ export const register = async (req: Request, res: Response): Promise<any> => {
             llmModel: 'gemini-3.6-flash',
             systemPrompt: `You are a helpful customer support agent for ${companyName}. Answer questions based only on the provided knowledge base.`,
             welcomeMessage: `Hi there! Welcome to ${companyName}. How can I help you today?`,
-            colorHex: '#0b57d0'
+            colorHex: '#059669'
         });
 
         return res.status(201).json({ message: 'Account created successfully. Please log in.' });

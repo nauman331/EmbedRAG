@@ -18,7 +18,7 @@ interface Message {
 export const ChatWidget: React.FC<ChatWidgetProps> = ({
     botId,
     botName = 'Support Assistant',
-    primaryColor = '#0b57d0',
+    primaryColor = '#059669',
     welcomeMessage = 'Hi there! How can I help you today?'
 }) => {
     // --- Standard Chat States ---
@@ -214,7 +214,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     };
 
     return (
-        <div className="fixed bottom-6 right-6 z-[9999] font-sans antialiased">
+        <div className="fixed bottom-[100px] lg:bottom-6 right-4 lg:right-6 z-[9999] font-sans antialiased">
             <style>
                 {`
                 @keyframes chatOpen {
