@@ -2,6 +2,8 @@ import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 import { ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatAnthropic } from '@langchain/anthropic';
+import { CohereRerank } from '@langchain/cohere';
+import { Document } from '@langchain/core/documents';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
@@ -75,7 +77,6 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
 
     try {
         const embeddings = getEmbeddings(geminiKey);
-
         const questionEmbedding = await embeddings.embedQuery(userMessage);
 
         // --- Semantic Cache Check ---
@@ -111,27 +112,45 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
             embeddingKey: 'embedding',
         });
 
-        const retriever = vectorStore.asRetriever({ k: 4, filter: { preFilter: { botId: { $eq: new mongoose.Types.ObjectId(botId) } } } });
+        // Fetch a larger pool of candidates because the Reranker will filter them down
+        const retriever = vectorStore.asRetriever({
+            k: 10,
+            filter: { preFilter: { botId: { $eq: new mongoose.Types.ObjectId(botId) } } }
+        });
+
+        // Initialize the Cohere Reranker
+        const cohereRerank = new CohereRerank({
+            apiKey: process.env.COHERE_API_KEY,
+            model: 'rerank-english-v3.0',
+            topN: 3 // We only pass the absolute best 3 chunks to the final LLM
+        });
 
         const searchKnowledgeBaseTool = tool(
             async ({ query, expandedQueries }) => {
                 logger.debug(`[RAG TOOL] Searching: "${query}" + ${expandedQueries.length} variants`);
 
+                // Fire off all searches concurrently
                 const allResults = await Promise.all([
                     retriever.invoke(query),
                     ...expandedQueries.map(q => retriever.invoke(q))
                 ]);
 
-                const uniqueDocs = new Map();
-                allResults.flat().forEach(doc => uniqueDocs.set(doc.pageContent, doc));
+                const uniqueDocs = new Map<string, Document>();
+                allResults.flat().forEach((doc: Document) => uniqueDocs.set(doc.pageContent, doc));
 
                 const finalDocs = Array.from(uniqueDocs.values());
-                if (finalDocs.length === 0) return 'No relevant information found in the knowledge base.';
-                return finalDocs.map(doc => doc.pageContent).join('\n\n');
+                if (finalDocs.length === 0) return 'No relevant information found.';
+
+                // --- THE SENIOR AI ENGINEER PATTERN ---
+                // Re-score the deduplicated pool against the user's primary query
+                logger.debug(`[RAG TOOL] Reranking ${finalDocs.length} unique chunks...`);
+                const compressedDocs = await cohereRerank.compressDocuments(finalDocs, query);
+
+                return compressedDocs.map((doc: Document) => doc.pageContent).join('\n\n');
             },
             {
                 name: 'search_knowledge_base',
-                description: 'Search the company knowledge base. You MUST provide the original query AND 2 alternate phrasing variations to ensure a match.',
+                description: 'Search the uploaded documents (which may include company policies, technical manuals, or candidate resumes). You MUST provide the original query AND 2 alternate phrasing variations to ensure a match.',
                 schema: z.object({
                     query: z.string(),
                     expandedQueries: z.array(z.string()).describe('Provide 2-3 alternate ways to ask this question to broaden the search.')
@@ -188,7 +207,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
                 // Filter out any poisoned SystemMessages stored in old checkpoints
                 const filteredMessages = state.messages.filter((msg: any) => msg._getType() !== 'system');
                 return [
-                    new SystemMessage(`${bot.systemPrompt}\n\nYou have tools available. Only use 'search_knowledge_base' if you need factual data.`),
+                    new SystemMessage(`${bot.systemPrompt}\n\nYou have tools available. ALWAYS use 'search_knowledge_base' before answering questions regarding facts, company policies, or the specific contents of an uploaded resume/CV. Do not guess.`),
                     ...filteredMessages
                 ];
             }
