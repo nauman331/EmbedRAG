@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
+import logoUrl from '../assets/logo.png';
 
 /* ------------------------------------------------------------------ */
 /*  Icons — kept as inline SVG to match the existing file, no new dep  */
@@ -146,7 +147,7 @@ const CacheLedgerDemo: React.FC = () => {
     useEffect(() => () => timeouts.current.forEach(clearTimeout), []);
 
     return (
-        <div className="bg-slate-900 rounded-3xl p-5 sm:p-8 md:p-10 max-w-3xl mx-auto shadow-2xl shadow-slate-900/20">
+        <div className="bg-slate-900 rounded-[2rem] p-6 sm:p-8 md:p-10 max-w-3xl mx-auto shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] shadow-emerald-500/10 animate-float border border-slate-800 relative z-10">
             <div className="flex items-center justify-between mb-6">
                 <span className="text-slate-400 text-sm">Your support widget</span>
                 <span className="flex gap-1.5" aria-hidden="true">
@@ -162,22 +163,24 @@ const CacheLedgerDemo: React.FC = () => {
                         <div className="py-16 text-center text-sm text-slate-400">Press play to watch a real conversation unfold</div>
                     )}
                     {rows.map((row) => (
-                        <div key={row.id} className="space-y-2 animate-[fadeIn_0.3s_ease-out]">
+                        <div key={row.id} className="space-y-2">
                             <div className="flex justify-end">
-                                <div className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-2xl rounded-br-sm max-w-[80%]">
+                                <div className="bg-emerald-600 text-white text-[15px] px-5 py-3 rounded-[1.25rem] rounded-br-sm max-w-[80%] shadow-sm animate-message-pop origin-bottom-right">
                                     {row.q}
                                 </div>
                             </div>
                             {row.status === 'pending' && (
                                 <div className="flex justify-start">
-                                    <div className="bg-slate-100 text-slate-400 text-sm px-4 py-2 rounded-2xl rounded-bl-sm">
-                                        thinking&hellip;
+                                    <div className="bg-slate-100/80 backdrop-blur text-slate-400 font-medium text-[15px] px-5 py-3 rounded-[1.25rem] rounded-bl-sm animate-message-pop origin-bottom-left flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse"></span>
+                                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse delay-75"></span>
+                                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse delay-150"></span>
                                     </div>
                                 </div>
                             )}
                             {(row.status === 'miss' || row.status === 'hit') && (
                                 <div className="flex justify-start flex-col items-start gap-1">
-                                    <div className="bg-slate-100 text-slate-800 text-sm px-4 py-2 rounded-2xl rounded-bl-sm max-w-[80%]">
+                                    <div className="bg-[#f8fafc] text-slate-700 text-[15px] px-5 py-3 rounded-[1.25rem] rounded-bl-sm max-w-[80%] shadow-sm border border-slate-100 animate-message-pop origin-bottom-left">
                                         {ANSWERS[row.id]}
                                     </div>
                                     {row.status === 'miss' ? (
@@ -202,11 +205,11 @@ const CacheLedgerDemo: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 mt-6">
+            <div className="flex flex-wrap items-center gap-4 mt-8">
                 <button
                     onClick={play}
                     disabled={playing}
-                    className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                    className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-sm font-bold px-6 py-3 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 shadow-md shadow-emerald-500/20 active:scale-95"
                 >
                     {playing ? 'Playing conversation…' : rows.length ? 'Watch it again' : 'Watch the demo'}
                 </button>
@@ -349,15 +352,8 @@ export const LandingPage: React.FC = () => {
             {/* ---------------- Header ---------------- */}
             <header className="bg-white/90 backdrop-blur border-b border-slate-200 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <a href="/" className="flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-500 rounded-lg">
-                        <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center shadow-inner">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                                <polyline points="2 17 12 22 22 17"></polyline>
-                                <polyline points="2 12 12 17 22 12"></polyline>
-                            </svg>
-                        </div>
-                        <span className="text-xl font-bold tracking-tight text-slate-800">EmbedAI</span>
+                    <a href="/" className="flex items-center outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-lg">
+                        <img src={logoUrl} alt="EmbedAI Logo" className="h-8 md:h-10 w-auto" />
                     </a>
 
                     <nav aria-label="Primary" className="hidden md:flex gap-8 font-medium text-slate-600 text-sm">
@@ -403,44 +399,50 @@ export const LandingPage: React.FC = () => {
 
             <main>
                 {/* ---------------- Hero ---------------- */}
-                <section className="pt-20 sm:pt-28 pb-16 px-6 max-w-7xl mx-auto text-center">
-                    <FadeIn>
-                        <span className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-full mb-6">
-                            {Icon.dot} No credit card required &middot; live in minutes
-                        </span>
-                    </FadeIn>
-                    <FadeIn delay={80}>
-                        <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-slate-900 tracking-tight leading-tight mb-6">
-                            Automate your support.<br />
-                            Answer it{' '}
-                            <span className="relative inline-block">
-                                <span className="relative z-10">instantly</span>
-                                <span className="absolute left-0 right-0 bottom-1 h-3 sm:h-4 bg-emerald-300/60 -rotate-1 -z-0" aria-hidden="true"></span>
-                            </span>{' '}
-                            the second time.
-                        </h1>
-                    </FadeIn>
-                    <FadeIn delay={160}>
-                        <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed">
-                            Upload your help docs, match your brand, and put an AI agent on your website in minutes. It remembers every answer it's already given, so your customers get instant replies and you never pay twice for the same question.
-                        </p>
-                    </FadeIn>
-                    <FadeIn delay={240}>
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                            <a href="/login" className="bg-slate-900 hover:bg-slate-800 text-white text-lg font-semibold px-8 py-4 rounded-full transition-all shadow-xl hover:shadow-2xl hover:-translate-y-0.5 flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-900">
-                                Get Started Free
-                                {Icon.arrow}
-                            </a>
-                            <a href="#how-it-works" className="text-slate-600 hover:text-slate-900 font-semibold px-8 py-4 flex items-center gap-2 transition-colors">
-                                See how it works
-                            </a>
-                        </div>
-                    </FadeIn>
-                    <FadeIn delay={320}>
-                        <p className="text-sm text-slate-400 mt-10">
-                            Powered by leading AI models from Google, OpenAI, and Anthropic
-                        </p>
-                    </FadeIn>
+                <section className="pt-24 sm:pt-32 pb-20 px-6 max-w-7xl mx-auto text-center relative overflow-hidden">
+                    {/* Glowing Orbs */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[600px] sm:h-[600px] bg-emerald-400/20 rounded-full blur-[80px] sm:blur-[100px] pointer-events-none animate-float opacity-70 z-0"></div>
+                    <div className="absolute top-1/4 left-1/3 w-[200px] h-[200px] sm:w-[300px] sm:h-[300px] bg-emerald-300/20 rounded-full blur-[60px] sm:blur-[80px] pointer-events-none animate-float opacity-50 z-0" style={{ animationDelay: '2s' }}></div>
+                    
+                    <div className="relative z-10">
+                        <FadeIn>
+                            <span className="inline-flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-100/50 backdrop-blur border border-emerald-200/60 px-4 py-2 rounded-full mb-8 shadow-sm">
+                                {Icon.dot} No credit card required &middot; live in minutes
+                            </span>
+                        </FadeIn>
+                        <FadeIn delay={80}>
+                            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-[5rem] font-extrabold text-slate-900 tracking-tight leading-[1.1] mb-8">
+                                Automate your support.<br />
+                                Answer it{' '}
+                                <span className="relative inline-block text-emerald-600">
+                                    <span className="relative z-10">instantly</span>
+                                    <span className="absolute left-0 right-0 bottom-2 h-4 sm:h-5 bg-emerald-200/40 -rotate-2 -z-0 rounded-full" aria-hidden="true"></span>
+                                </span>{' '}
+                                the second time.
+                            </h1>
+                        </FadeIn>
+                        <FadeIn delay={160}>
+                            <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto mb-12 leading-relaxed font-medium">
+                                Upload your help docs, match your brand, and put an AI agent on your website in minutes. It remembers every answer it's already given, so your customers get instant replies and you never pay twice for the same question.
+                            </p>
+                        </FadeIn>
+                        <FadeIn delay={240}>
+                            <div className="flex flex-col sm:flex-row gap-5 justify-center items-center">
+                                <a href="/login" className="w-full sm:w-auto bg-[linear-gradient(110deg,#0f172a,45%,#1e293b,55%,#0f172a)] bg-[length:200%_100%] animate-shimmer text-white text-lg font-bold px-10 py-4 rounded-full transition-all shadow-[0_10px_20px_-10px_rgba(15,23,42,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(15,23,42,0.7)] hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-900">
+                                    Get Started Free
+                                    {Icon.arrow}
+                                </a>
+                                <a href="#how-it-works" className="w-full sm:w-auto text-slate-600 hover:text-slate-900 font-semibold px-8 py-4 flex items-center justify-center gap-2 transition-colors">
+                                    See how it works
+                                </a>
+                            </div>
+                        </FadeIn>
+                        <FadeIn delay={320}>
+                            <p className="text-sm text-slate-400 mt-10">
+                                Powered by leading AI models from Google, OpenAI, and Anthropic
+                            </p>
+                        </FadeIn>
+                    </div>
                 </section>
 
                 {/* ---------------- Stats bar ---------------- */}
@@ -679,15 +681,10 @@ export const LandingPage: React.FC = () => {
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-10 pb-12 border-b border-slate-800">
                         <div className="col-span-2">
-                            <div className="flex items-center gap-2 mb-4">
-                                <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                                        <polyline points="2 17 12 22 22 17"></polyline>
-                                        <polyline points="2 12 12 17 22 12"></polyline>
-                                    </svg>
-                                </div>
-                                <span className="text-lg font-bold text-white">EmbedAI</span>
+                            <div className="flex items-center mb-4">
+                                <a href="/">
+                                    <img src={logoUrl} alt="EmbedAI Logo" className="h-8 md:h-10 w-auto" />
+                                </a>
                             </div>
                             <p className="text-sm leading-relaxed max-w-xs">AI-powered support, live on your site in minutes.</p>
                         </div>

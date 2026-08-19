@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { setAccessToken } from '../utils/api';
 import { useApi } from '../hooks/useApi';
+import logoUrl from '../assets/logo.png';
 
 interface AuthProps {
     onLoginSuccess: (user: any) => void;
@@ -75,20 +76,20 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
-            <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-100 p-8">
-                <div className="text-center mb-8">
-                    <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                            <polyline points="2 17 12 22 22 17"></polyline>
-                            <polyline points="2 12 12 17 22 12"></polyline>
-                        </svg>
-                    </div>
-                    <h2 className="text-2xl font-bold text-slate-800">
-                        {isLogin ? 'Welcome back to EmbedAI' : 'Create your workspace'}
+        <div className="min-h-screen bg-[#f8fafc] flex flex-col justify-center items-center p-4 font-sans relative overflow-hidden">
+            {/* Ambient Background Glows */}
+            <div className="absolute top-0 left-1/4 w-[400px] h-[400px] bg-emerald-400/10 rounded-full blur-[100px] pointer-events-none animate-float z-0"></div>
+            <div className="absolute bottom-0 right-1/4 w-[300px] h-[300px] bg-emerald-300/10 rounded-full blur-[80px] pointer-events-none animate-float z-0" style={{ animationDelay: '2s' }}></div>
+
+            <div className="max-w-md w-full bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 p-8 sm:p-10 z-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="text-center mb-10">
+                    <a href="/">
+                        <img src={logoUrl} alt="EmbedAI Logo" className="h-10 md:h-12 w-auto mx-auto mb-6" />
+                    </a>
+                    <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
+                        {isLogin ? 'Welcome back' : 'Create your workspace'}
                     </h2>
-                    <p className="text-slate-500 mt-2 text-sm">
+                    <p className="text-slate-500 mt-2 text-sm font-medium">
                         {isLogin ? 'Enter your details to access your dashboard.' : 'Start building autonomous agents for your business.'}
                     </p>
                 </div>
@@ -99,39 +100,39 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-5">
                     {!isLogin && (
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">Company Name</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-1.5">Company Name</label>
                             <input
                                 type="text"
                                 required
                                 value={companyName}
                                 onChange={(e) => setCompanyName(e.target.value)}
-                                className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-400 outline-none transition-all font-medium text-slate-800 placeholder-slate-400"
                                 placeholder="Acme Corp"
                             />
                         </div>
                     )}
                     <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-1">Email Address</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Email Address</label>
                         <input
                             type="email"
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-400 outline-none transition-all font-medium text-slate-800 placeholder-slate-400"
                             placeholder="you@company.com"
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-1">Password</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Password</label>
                         <input
                             type="password"
                             required
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-400 outline-none transition-all font-medium text-slate-800 placeholder-slate-400"
                             placeholder="••••••••"
                         />
                     </div>
@@ -139,17 +140,17 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors mt-2 disabled:opacity-50"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-md shadow-emerald-600/20 mt-4 disabled:opacity-50"
                     >
                         {isLoading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
                     </button>
                 </form>
 
-                <div className="mt-6 text-center text-sm text-slate-500">
+                <div className="mt-8 text-center text-sm text-slate-500 font-medium">
                     {isLogin ? "Don't have an account? " : "Already have an account? "}
                     <button
                         onClick={() => { setIsLogin(!isLogin); setError(''); }}
-                        className="text-blue-600 font-semibold hover:underline"
+                        className="text-emerald-600 font-bold hover:text-emerald-700 hover:underline"
                     >
                         {isLogin ? 'Sign up' : 'Log in'}
                     </button>
