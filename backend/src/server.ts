@@ -47,11 +47,7 @@ app.use(cookieParser());
 app.set('trust proxy', 1); // Trust first proxy (required for correct IP extraction behind load balancers)
 
 // --- CORS ---
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
-    .split(',')
-    .map(o => o.trim().replace(/^["']|["']$/g, '').replace(/\/$/, '')) // remove quotes and trailing slash
-    .map(o => o.startsWith('http') ? o : `https://${o}`) // ensure protocol is present
-    .filter(Boolean);
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '');
 
 app.use(cors({
     origin: (origin, callback) => {
@@ -156,5 +152,5 @@ process.on('uncaughtException', (error) => {
 server.listen(port, () => {
     logger.info(`🚀 Backend running on port ${port} [${process.env.NODE_ENV || 'development'}]`);
     logger.info(`🔌 Socket.io initialized and listening`);
-    logger.info(`✅ Allowed origins: ${allowedOrigins.join(', ')}`);
+    logger.info(`✅ Allowed origins: ${allowedOrigins}`);
 });
