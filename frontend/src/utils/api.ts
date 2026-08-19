@@ -12,6 +12,8 @@ export const setAccessToken = (token: string | null) => {
 
 export const getAccessToken = () => currentAccessToken;
 
+let refreshPromise: Promise<string> | null = null;
+
 export const fetchWithAuth = async (url: string, options: RequestInit = {}): Promise<Response> => {
     const makeHeaders = (token: string | null) => {
         const headers: Record<string, string> = {
@@ -29,29 +31,32 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}): Pro
 
     let response = await fetch(url, { ...options, headers: makeHeaders(currentAccessToken) });
 
-    if (response.status === 403) {
-        console.log('🔄 Access token expired. Attempting silent refresh...');
-
-        try {
-            const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
+    if (response.status === 401 || response.status === 403) {
+        if (!refreshPromise) {
+            refreshPromise = fetch(`${API_URL}/api/auth/refresh`, {
                 method: 'POST',
                 credentials: 'include'
+            }).then(async (refreshRes) => {
+                if (!refreshRes.ok) {
+                    throw new Error('Session expired or revoked.');
+                }
+                const data = await refreshRes.json();
+                setAccessToken(data.accessToken);
+                return data.accessToken;
+            }).catch((error) => {
+                setAccessToken(null);
+                window.dispatchEvent(new Event('auth_expired'));
+                throw error;
+            }).finally(() => {
+                refreshPromise = null;
             });
+        }
 
-            if (!refreshRes.ok) {
-                throw new Error('Session expired or revoked.');
-            }
-
-            const data = await refreshRes.json();
-            setAccessToken(data.accessToken);
-
-            response = await fetch(url, { ...options, headers: makeHeaders(data.accessToken) });
-
+        try {
+            const newToken = await refreshPromise;
+            response = await fetch(url, { ...options, headers: makeHeaders(newToken) });
         } catch (error) {
-            console.error('🚨 Silent refresh failed. User must log in again.');
-            setAccessToken(null);
-            window.dispatchEvent(new Event('auth_expired'));
-            throw error;
+            // Already handled by the promise catch, just let it bubble or ignore
         }
     }
 

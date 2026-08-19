@@ -21,8 +21,13 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
         setError('');
 
         // Client-side validation before hitting the server
-        if (!isLogin && companyName.trim().length === 0) {
-            return setError('Company name is required.');
+        if (!isLogin) {
+            if (companyName.trim().length === 0) {
+                return setError('Company name is required.');
+            }
+            if (companyName.trim().length > 100) {
+                return setError('Company name cannot exceed 100 characters.');
+            }
         }
         if (password.length < 8) {
             return setError('Password must be at least 8 characters.');

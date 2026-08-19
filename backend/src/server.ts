@@ -62,8 +62,8 @@ app.use(cors({
             return callback(null, true);
         }
 
-        // Safe fallback for Render preview environments / misconfigurations
-        if (origin.endsWith('.onrender.com') || origin.startsWith('http://localhost:')) {
+        // Safe fallback for localhost dev environments
+        if (origin.startsWith('http://localhost:')) {
             return callback(null, true);
         }
 

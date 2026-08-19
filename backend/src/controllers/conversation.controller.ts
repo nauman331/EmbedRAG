@@ -2,6 +2,11 @@ import { Response } from 'express';
 import Conversation from '../models/conversation.model.js';
 import Bot from '../models/bot.model.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
+import { z } from 'zod';
+
+export const adminReplySchema = z.object({
+    message: z.string().min(1, 'Message is required.').max(5000, 'Message cannot exceed 5000 characters.')
+});
 
 export const getConversations = async (req: AuthRequest, res: Response): Promise<any> => {
     try {
@@ -49,12 +54,13 @@ export const takeOverConversation = async (req: AuthRequest, res: Response): Pro
 export const adminReply = async (req: AuthRequest, res: Response): Promise<any> => {
     try {
         const sessionId = req.params.sessionId;
-        const { message } = req.body;
         const tenantId = req.user?.tenantId;
 
-        if (!message || typeof message !== 'string' || message.trim().length === 0) {
-            return res.status(400).json({ error: 'Message is required.' });
+        const validation = adminReplySchema.safeParse(req.body);
+        if (!validation.success) {
+            return res.status(400).json({ error: validation.error.issues[0].message });
         }
+        const { message } = validation.data;
 
         // Verify ownership: resolve conversation → bot → tenant
         const convo = await Conversation.findOne({ sessionId });

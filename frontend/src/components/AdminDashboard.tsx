@@ -6,10 +6,9 @@ import logoUrl from '../assets/logo.png';
 
 interface AdminDashboardProps {
     botId: string;
-    tenantId: string;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
     const [activeTab, setActiveTab] = useState<'knowledge' | 'settings' | 'install' | 'inbox' | 'analytics' | 'leads' | 'security'>('settings');
 
     const [file, setFile] = useState<File | null>(null);
@@ -186,7 +185,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
 
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('tenantId', tenantId);
         formData.append('botId', botId);
 
         try {
@@ -765,8 +763,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                             <span className="text-5xl font-bold tracking-tight">{analyticsData?.totalConversations?.toLocaleString() || 0}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="bg-emerald-500/30 px-2 py-1 rounded-md text-xs font-bold text-emerald-50">+12.8%</span>
-                                            <span className="text-xs text-emerald-200">from last week</span>
+                                            <span className="bg-emerald-500/30 px-2 py-1 rounded-md text-xs font-bold text-emerald-50">Active</span>
+                                            <span className="text-xs text-emerald-200">total volume</span>
                                         </div>
                                     </div>
                                     <div className="relative z-10 flex items-end justify-between mt-8">
@@ -830,7 +828,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId, tenantId 
                                         </div>
                                         <div className="flex items-end gap-4">
                                             <span className="text-4xl font-bold text-slate-800">{analyticsData?.cacheHits?.toLocaleString() || 0}</span>
-                                            <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs font-bold mb-1">+5.2%</span>
                                         </div>
                                     </div>
                                     <div className="w-24 h-16 bg-emerald-50 rounded-xl relative overflow-hidden hidden sm:block">

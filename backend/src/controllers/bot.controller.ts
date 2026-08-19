@@ -5,6 +5,22 @@ import SemanticCache from '../models/semanticcache.model.js';
 import Conversation from '../models/conversation.model.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import mongoose from 'mongoose';
+import { z } from 'zod';
+import logger from '../config/logger.js';
+
+export const updateBotConfigSchema = z.object({
+    name: z.string().max(100).optional(),
+    systemPrompt: z.string().max(8000).optional(),
+    welcomeMessage: z.string().max(500).optional(),
+    colorHex: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    llmProvider: z.enum(['GEMINI', 'OPENAI', 'ANTHROPIC']).optional(),
+    llmModel: z.string().max(100).optional(),
+    apiKeys: z.object({
+        gemini: z.string().max(200).optional(),
+        openai: z.string().max(200).optional(),
+        anthropic: z.string().max(200).optional()
+    }).optional()
+});
 
 export const getWorkspaceBots = async (req: AuthRequest, res: Response): Promise<any> => {
     try {
@@ -12,7 +28,7 @@ export const getWorkspaceBots = async (req: AuthRequest, res: Response): Promise
         const bots = await Bot.find({ tenantId });
         return res.status(200).json(bots);
     } catch (error: any) {
-        console.error('Error fetching workspace bots:', error);
+        logger.error('Error fetching workspace bots:', error);
         return res.status(500).json({ error: 'Failed to fetch your bots.' });
     }
 };
@@ -23,6 +39,11 @@ export const createWorkspaceBot = async (req: AuthRequest, res: Response): Promi
         const tenant = await Tenant.findById(tenantId);
         
         if (!tenant) return res.status(404).json({ error: 'Tenant not found.' });
+
+        const existingBotsCount = await Bot.countDocuments({ tenantId });
+        if (existingBotsCount >= 5) {
+            return res.status(429).json({ error: 'Bot limit reached. Maximum 5 bots per workspace.' });
+        }
 
         const newBot = await Bot.create({
             tenantId,
@@ -36,7 +57,7 @@ export const createWorkspaceBot = async (req: AuthRequest, res: Response): Promi
 
         return res.status(201).json(newBot);
     } catch (error: any) {
-        console.error('Error creating workspace bot:', error);
+        logger.error('Error creating workspace bot:', error);
         return res.status(500).json({ error: 'Failed to create bot.' });
     }
 };
@@ -70,7 +91,7 @@ export const getBotConfig = async (req: AuthRequest, res: Response): Promise<any
 
         return res.status(200).json(responseData);
     } catch (error: any) {
-        console.error('Error fetching bot:', error);
+        logger.error('Error fetching bot:', error);
         return res.status(500).json({ error: 'Failed to fetch bot configuration.' });
     }
 };
@@ -122,7 +143,7 @@ export const updateBotConfig = async (req: AuthRequest, res: Response): Promise<
             bot: updatedBot
         });
     } catch (error: any) {
-        console.error('Error updating bot:', error);
+        logger.error('Error updating bot:', error);
         return res.status(500).json({ error: 'Failed to update bot configuration.' });
     }
 };
@@ -169,7 +190,7 @@ export const getEmbedScript = async (req: Request, res: Response): Promise<any> 
         res.setHeader('Content-Type', 'application/javascript');
         return res.send(script);
     } catch (error) {
-        console.error('Error generating embed script:', error);
+        logger.error('Error generating embed script:', error);
         return res.status(500).send('console.error("EmbedAI: Failed to load widget");');
     }
 };
@@ -227,7 +248,7 @@ export const getBotAnalytics = async (req: Request, res: Response): Promise<any>
         });
 
     } catch (error) {
-        console.error('Error fetching analytics:', error);
+        logger.error('Error fetching analytics:', error);
         return res.status(500).json({ error: 'Failed to fetch analytics.' });
     }
 };

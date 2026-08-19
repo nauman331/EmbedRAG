@@ -3,6 +3,7 @@ import multer from 'multer';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
+import Bot from '../models/bot.model.js';
 import Tenant from '../models/tenant.model.js';
 import KnowledgeSource from '../models/knowledge.model.js';
 import DocumentChunk from '../models/documentchunk.model.js';
@@ -45,7 +46,16 @@ export const uploadKnowledge = async (req: AuthRequest, res: Response): Promise<
         }
 
         const tenant = await Tenant.findById(tenantId);
-        if (!tenant || !tenant.apiKeys?.gemini) {
+        if (!tenant) {
+            return res.status(401).json({ error: 'Unauthorized.' });
+        }
+
+        const bot = await Bot.findById(botId);
+        if (!bot || bot.tenantId.toString() !== tenantId) {
+            return res.status(404).json({ error: 'Bot not found.' });
+        }
+
+        if (!tenant.apiKeys?.gemini) {
             return res.status(400).json({ error: 'Missing Gemini API Key. Please add it in Dashboard → Settings.' });
         }
 

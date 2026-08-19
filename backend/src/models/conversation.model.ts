@@ -17,7 +17,7 @@ export interface IConversation extends Document {
 
 const MessageSchema: Schema = new Schema({
     role: { type: String, enum: ['user', 'bot', 'admin'], required: true },
-    content: { type: String, required: true },
+    content: { type: String, required: true, maxlength: 5000 },
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -42,5 +42,7 @@ const ConversationSchema: Schema = new Schema(
     },
     { timestamps: true }
 );
+
+ConversationSchema.index({ botId: 1, sessionId: 1 }, { unique: true });
 
 export default mongoose.model<IConversation>('Conversation', ConversationSchema);

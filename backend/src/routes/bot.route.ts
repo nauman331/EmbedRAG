@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { getBotConfig, updateBotConfig, getEmbedScript, getBotAnalytics, getWorkspaceBots, createWorkspaceBot } from '../controllers/bot.controller.js';
+import { getBotConfig, updateBotConfig, getEmbedScript, getBotAnalytics, getWorkspaceBots, createWorkspaceBot, updateBotConfigSchema } from '../controllers/bot.controller.js';
 import { requireAuth, requireBotOwnership } from '../middlewares/auth.middleware.js';
+import { validate } from '../middlewares/validate.middleware.js';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.post('/', requireAuth, createWorkspaceBot);
 
 // Authenticated + Ownership: Read, update, and analytics for a specific bot
 router.get('/:id', requireAuth, requireBotOwnership, getBotConfig);
-router.put('/:id', requireAuth, requireBotOwnership, updateBotConfig);
+router.put('/:id', requireAuth, requireBotOwnership, validate(updateBotConfigSchema), updateBotConfig);
 router.get('/:id/analytics', requireAuth, requireBotOwnership, getBotAnalytics);
 
 export default router;

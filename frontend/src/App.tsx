@@ -156,7 +156,6 @@ const App: React.FC = () => {
         <div className="w-full h-full">
           <AdminDashboard
             botId={activeBotId}
-            tenantId={user?.tenantId}
           />
         </div>
 
