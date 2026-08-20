@@ -42,7 +42,9 @@ if (
 const app = express();
 
 // --- Security middleware ---
-app.use(helmet());
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(cookieParser());
 app.set('trust proxy', 1); // Trust first proxy (required for correct IP extraction behind load balancers)
 
