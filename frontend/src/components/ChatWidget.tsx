@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL;
 
@@ -57,7 +59,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
         const storedId = localStorage.getItem('embedai_session_id');
         if (storedId) return storedId;
 
-        // Use cryptographically secure UUID — Math.random() is predictable and guessable
+        // Use cryptographically secure UUID
         const newId = crypto.randomUUID();
         localStorage.setItem('embedai_session_id', newId);
         return newId;
@@ -75,7 +77,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     useEffect(() => {
         socketRef.current = io(SOCKET_URL);
 
-        // NEW: Join the specific room for this session so the Admin can direct-message this widget!
+        // Join the specific room for this session
         socketRef.current.emit('join_session', sessionId);
 
         socketRef.current.on('bot_response_chunk', (data: { chunk: string }) => {
@@ -106,7 +108,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
             if (voiceModeRef.current && accumulatedResponseRef.current) {
                 speakText(accumulatedResponseRef.current);
             }
-            accumulatedResponseRef.current = ''; // Reset for the next message
+            accumulatedResponseRef.current = '';
         });
 
         socketRef.current.on('bot_error', (data: { error: string }) => {
@@ -144,7 +146,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
     const speakText = (text: string) => {
         if (!('speechSynthesis' in window)) return;
-        window.speechSynthesis.cancel(); // Stop any ongoing speech
+        window.speechSynthesis.cancel();
 
         // Remove markdown, emojis, and formatting for a cleaner voice output
         const cleanText = text
@@ -164,7 +166,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
         const recognition = new SpeechRecognition();
         recognition.continuous = false;
-        recognition.interimResults = true; // Show text as they speak
+        recognition.interimResults = true;
 
         recognition.onstart = () => setIsListening(true);
 
@@ -179,7 +181,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
             console.error('Speech recognition error:', event.error);
             setIsListening(false);
 
-            // Provide friendly visual feedback to the user
             if (event.error === 'network') {
                 setInputText('Network error: Please check your connection or VPN.');
             } else if (event.error === 'not-allowed') {
@@ -188,7 +189,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                 setInputText(`Mic error: ${event.error}`);
             }
 
-            // Clear the error message after 3 seconds
             setTimeout(() => setInputText(''), 3000);
         };
 
@@ -311,7 +311,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                                         <span className="text-xs text-slate-500 mb-1 ml-3 font-medium">Assistant</span>
                                     )}
                                     <div
-                                        className={`px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap break-words shadow-sm
+                                        className={`px-4 py-3 text-[15px] leading-relaxed break-words shadow-sm
                                             ${msg.role === 'user'
                                                 ? 'rounded-[20px] rounded-br-sm text-white'
                                                 : 'rounded-[20px] rounded-bl-sm bg-white text-slate-700 border border-slate-100'
@@ -325,7 +325,29 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                                                 <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
                                                 <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
                                             </span>
-                                        ) : msg.content}
+                                        ) : msg.role === 'bot' ? (
+                                            /* ✨ NEW: Render Markdown for Bot messages ✨ */
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    h3: ({ node, ...props }) => <h3 className="text-lg font-bold text-slate-800 mt-4 mb-2" {...props} />,
+                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-2 space-y-1" {...props} />,
+                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-2 space-y-1" {...props} />,
+                                                    li: ({ node, ...props }) => <li className="text-slate-600" {...props} />,
+                                                    strong: ({ node, ...props }) => <strong className="font-semibold text-slate-900" {...props} />,
+                                                    p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                                                    a: ({ node, ...props }) => <a className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                                                    code: ({ node, inline, ...props }: any) =>
+                                                        inline ? <code className="bg-slate-100 text-pink-600 px-1 py-0.5 rounded text-sm font-mono" {...props} />
+                                                            : <code className="block bg-slate-800 text-slate-50 p-3 rounded-md text-sm font-mono overflow-x-auto my-2" {...props} />
+                                                }}
+                                            >
+                                                {msg.content}
+                                            </ReactMarkdown>
+                                        ) : (
+                                            /* User messages remain plain text */
+                                            msg.content
+                                        )}
                                     </div>
                                 </div>
                             ) : null
