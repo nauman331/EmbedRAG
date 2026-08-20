@@ -126,7 +126,7 @@ const App: React.FC = () => {
     );
   }
 
-  const DashboardLayout = () => {
+  const renderDashboardLayout = () => {
     if (!activeBotId) {
       if (!hasFetchedBots) {
         return (
@@ -169,21 +169,6 @@ const App: React.FC = () => {
     );
   };
 
-  // Proper widget route component using useParams() — not fragile pathname splitting
-  const WidgetRoute = () => {
-    const { botId } = useParams<{ botId: string }>();
-    return (
-      <div className="bg-transparent h-screen w-screen overflow-hidden">
-        <ChatWidget
-          botId={botId || ''}
-          botName={botConfig.name}
-          primaryColor={botConfig.colorHex}
-          welcomeMessage={botConfig.welcomeMessage}
-        />
-      </div>
-    );
-  };
-
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
@@ -193,7 +178,7 @@ const App: React.FC = () => {
         element={
           user ? <Navigate to="/dashboard" replace /> : <Auth onLoginSuccess={async (loggedInUser) => {
             setUser(loggedInUser);
-            await fetchUserBots(); // Load bots after manual login
+            await fetchUserBots();
             navigate('/dashboard');
           }} />
         }
@@ -202,15 +187,29 @@ const App: React.FC = () => {
       <Route
         path="/dashboard"
         element={
-          user ? <DashboardLayout /> : <Navigate to="/login" replace />
+          user ? renderDashboardLayout() : <Navigate to="/login" replace />
         }
       />
 
-      <Route path="/widget/:botId" element={<WidgetRoute />} />
+      <Route path="/widget/:botId" element={<WidgetRoute botConfig={botConfig} />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
+
+const WidgetRoute = ({ botConfig }: { botConfig: any }) => {
+  const { botId } = useParams<{ botId: string }>();
+  return (
+    <div className="bg-transparent h-screen w-screen overflow-hidden">
+      <ChatWidget
+        botId={botId || ''}
+        botName={botConfig.name}
+        primaryColor={botConfig.colorHex}
+        welcomeMessage={botConfig.welcomeMessage}
+      />
+    </div>
+  );
+};
 
 export default App;

@@ -58,6 +58,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
             .catch(err => console.error("Failed to fetch conversations", err));
     };
 
+    const fetchSessions = async () => {
+        setIsLoadingSessions(true);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/api/auth/sessions`);
+            if (res.ok) {
+                const data = await res.json();
+                setSessions(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch sessions:", err);
+        } finally {
+            setIsLoadingSessions(false);
+        }
+    };
+
+    const fetchKnowledgeSources = async () => {
+        setIsLoadingSources(true);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/api/knowledge/${botId}`);
+            const data = await res.json();
+            if (res.ok) setKnowledgeSources(data);
+        } catch (err) {
+            console.error("Failed to fetch knowledge sources:", err);
+        } finally {
+            setIsLoadingSources(false);
+        }
+    };
+
     useEffect(() => {
         let interval: any;
         if (activeTab === 'inbox') {
@@ -82,21 +110,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
         return () => { if (interval) clearInterval(interval); }
     }, [activeTab, botId]);
 
-    const fetchSessions = async () => {
-        setIsLoadingSessions(true);
-        try {
-            const res = await fetchWithAuth(`${API_URL}/api/auth/sessions`);
-            if (res.ok) {
-                const data = await res.json();
-                setSessions(data);
-            }
-        } catch (err) {
-            console.error("Failed to fetch sessions:", err);
-        } finally {
-            setIsLoadingSessions(false);
-        }
-    };
-
     const handleRevokeSession = async (sessionId: string) => {
         if (!window.confirm("Are you sure you want to log out of that device?")) return;
         try {
@@ -118,19 +131,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
         setShowScrollButton(scrollHeight - scrollTop - clientHeight > 100);
-    };
-
-    const fetchKnowledgeSources = async () => {
-        setIsLoadingSources(true);
-        try {
-            const res = await fetchWithAuth(`${API_URL}/api/knowledge/${botId}`);
-            const data = await res.json();
-            if (res.ok) setKnowledgeSources(data);
-        } catch (err) {
-            console.error("Failed to fetch knowledge sources:", err);
-        } finally {
-            setIsLoadingSources(false);
-        }
     };
 
     useEffect(() => {

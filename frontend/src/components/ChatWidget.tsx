@@ -74,6 +74,19 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
         }
     }, [welcomeMessage]);
 
+    const speakText = (text: string) => {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+
+        // Remove markdown, emojis, and formatting for a cleaner voice output
+        const cleanText = text
+            .replace(/[*#_`~]/g, '')
+            .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        window.speechSynthesis.speak(utterance);
+    };
+
     useEffect(() => {
         socketRef.current = io(SOCKET_URL);
 
@@ -143,19 +156,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
             window.parent.postMessage('embedai-close', parentOrigin);
         }
     }, [isOpen]);
-
-    const speakText = (text: string) => {
-        if (!('speechSynthesis' in window)) return;
-        window.speechSynthesis.cancel();
-
-        // Remove markdown, emojis, and formatting for a cleaner voice output
-        const cleanText = text
-            .replace(/[*#_`~]/g, '')
-            .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
-
-        const utterance = new SpeechSynthesisUtterance(cleanText);
-        window.speechSynthesis.speak(utterance);
-    };
 
     const toggleListen = () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
