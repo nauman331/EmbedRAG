@@ -8,6 +8,8 @@ import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { EnsembleRetriever } from "@langchain/classic/retrievers/ensemble";
+import { BM25Retriever } from "@langchain/community/retrievers/bm25";
 import { MongoDBSaver } from '@langchain/langgraph-checkpoint-mongodb';
 import mongoose from 'mongoose';
 import Bot from '../models/bot.model.js';
@@ -55,12 +57,11 @@ const getEmbeddings = (apiKey: string) => {
  * or being passed as part of system context.
  */
 const sanitizeForCache = (text: string): string => {
-    // Remove common prompt injection patterns
     return text
         .replace(/\bignore\s+(all\s+)?previous\s+instructions?\b/gi, '[redacted]')
         .replace(/\bsystem\s+prompt\b/gi, '[redacted]')
-        .replace(/<\/?script[^>]*>/gi, '') // Strip any HTML script tags
-        .substring(0, 2000); // Cap length to prevent extremely long cache entries
+        .replace(/<\/?script[^>]*>/gi, '')
+        .substring(0, 2000);
 };
 
 export const generateBotResponse = async (botId: string, userMessage: string, sessionId: string) => {
@@ -112,8 +113,8 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
             embeddingKey: 'embedding',
         });
 
-        // Fetch a larger pool of candidates because the Reranker will filter them down
-        const retriever = vectorStore.asRetriever({
+        // 1. Vector Retriever (Semantic Match)
+        const vectorRetriever = vectorStore.asRetriever({
             k: 10,
             filter: { preFilter: { botId: { $eq: new mongoose.Types.ObjectId(botId) } } }
         });
@@ -122,27 +123,40 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
         const cohereRerank = new CohereRerank({
             apiKey: process.env.COHERE_API_KEY,
             model: 'rerank-english-v3.0',
-            topN: 3 // We only pass the absolute best 3 chunks to the final LLM
+            topN: 3
         });
 
         const searchKnowledgeBaseTool = tool(
             async ({ query, expandedQueries }) => {
-                logger.debug(`[RAG TOOL] Searching: "${query}" + ${expandedQueries.length} variants`);
+                logger.debug(`[RAG TOOL] Hybrid Searching: "${query}" + ${expandedQueries.length} variants`);
 
-                // Fire off all searches concurrently
+                // 2. BM25 Retriever (Exact Keyword Match)
+                const rawDocs = await collection.find({ botId: new mongoose.Types.ObjectId(botId) }).toArray();
+                const bm25Retriever = new BM25Retriever({
+                    docs: rawDocs.map(d => new Document({ pageContent: d.text })),
+                    k: 10
+                });
+
+                // 3. Ensemble Retriever (Combines Vector + BM25)
+                const ensembleRetriever = new EnsembleRetriever({
+                    retrievers: [vectorRetriever, bm25Retriever],
+                    weights: [0.5, 0.5],
+                });
+
+                // Fire off all hybrid searches concurrently
                 const allResults = await Promise.all([
-                    retriever.invoke(query),
-                    ...expandedQueries.map(q => retriever.invoke(q))
+                    ensembleRetriever.invoke(query),
+                    ...expandedQueries.map(q => ensembleRetriever.invoke(q))
                 ]);
 
+                // Deduplicate
                 const uniqueDocs = new Map<string, Document>();
                 allResults.flat().forEach((doc: Document) => uniqueDocs.set(doc.pageContent, doc));
 
                 const finalDocs = Array.from(uniqueDocs.values());
                 if (finalDocs.length === 0) return 'No relevant information found.';
 
-                // --- THE SENIOR AI ENGINEER PATTERN ---
-                // Re-score the deduplicated pool against the user's primary query
+                // 4. Compress and Rerank with Cohere
                 logger.debug(`[RAG TOOL] Reranking ${finalDocs.length} unique chunks...`);
                 const compressedDocs = await cohereRerank.compressDocuments(finalDocs, query);
 
@@ -192,7 +206,7 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
             llmCache.set(cacheKey, llm);
         }
 
-        // --- Persistent checkpointer backed by MongoDB (survives restarts, shared across workers) ---
+        // --- Persistent checkpointer backed by MongoDB ---
         const db = mongoose.connection.db;
         const checkpointer = new MongoDBSaver({
             client: mongoose.connection.getClient() as any,
@@ -204,7 +218,6 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
             tools: [searchKnowledgeBaseTool, captureLeadTool],
             checkpointSaver: checkpointer,
             prompt: (state: any) => {
-                // Filter out any poisoned SystemMessages stored in old checkpoints
                 const filteredMessages = state.messages.filter((msg: any) => msg._getType() !== 'system');
                 return [
                     new SystemMessage(`${bot.systemPrompt}\n\nYou have tools available. ALWAYS use 'search_knowledge_base' before answering questions regarding facts, company policies, or the specific contents of an uploaded resume/CV. Do not guess.`),
@@ -240,7 +253,6 @@ export const generateBotResponse = async (botId: string, userMessage: string, se
                 }
             }
 
-            // Store sanitized response in SemanticCache for future hits
             if (fullAgentResponse.trim() !== '') {
                 const sanitizedQuestion = sanitizeForCache(userMessage);
                 const sanitizedAnswer = sanitizeForCache(fullAgentResponse);

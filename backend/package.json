@@ -15,6 +15,7 @@
   "type": "module",
   "dependencies": {
     "@langchain/anthropic": "^1.5.4",
+    "@langchain/classic": "^1.0.44",
     "@langchain/cohere": "^1.1.0",
     "@langchain/community": "^1.1.29",
     "@langchain/core": "^1.2.5",
