@@ -44,6 +44,9 @@ services:
     pullRequestPreviewsEnabled: true  # Render builds preview URLs for PRs
     headers:
       - path: /*
+        name: X-Frame-Options
+        value: ""
+      - path: /*
         name: X-Content-Type-Options
         value: nosniff
     routes:
