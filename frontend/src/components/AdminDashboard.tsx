@@ -613,7 +613,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
                                         <div className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e]"></div>
                                         <div className="w-3.5 h-3.5 rounded-full bg-[#27c93f]"></div>
                                     </div>
-                                    <button onClick={() => navigator.clipboard.writeText(`<script src="${API_URL}/api/bots/embed/${botId}"></script>`)} className="text-xs font-bold text-slate-300 hover:text-emerald-400 bg-slate-700/50 hover:bg-slate-700 px-4 py-2 rounded-lg transition-all">
+                                    <button onClick={() => navigator.clipboard.writeText(`<script defer src="${API_URL}/api/bots/embed/${botId}"></script>`)} className="text-xs font-bold text-slate-300 hover:text-emerald-400 bg-slate-700/50 hover:bg-slate-700 px-4 py-2 rounded-lg transition-all">
                                         Copy Code
                                     </button>
                                 </div>

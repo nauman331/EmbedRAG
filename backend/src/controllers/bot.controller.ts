@@ -183,7 +183,14 @@ export const getEmbedScript = async (req: Request, res: Response): Promise<any> 
                     }
                 });
 
-                document.body.appendChild(iframe);
+                // Handle cases where the script is placed in the <head> before body exists
+                if (document.body) {
+                    document.body.appendChild(iframe);
+                } else {
+                    document.addEventListener('DOMContentLoaded', function() {
+                        document.body.appendChild(iframe);
+                    });
+                }
             })();
         `;
 
