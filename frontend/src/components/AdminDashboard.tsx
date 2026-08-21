@@ -547,6 +547,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
                                         <label className="block text-sm font-bold text-slate-700 mb-2">System Prompt (Instructions)</label>
                                         <textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={5} className="w-full px-5 py-4 rounded-xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all text-slate-800 resize-y font-medium bg-[#f8fafc]" placeholder="E.g., You are a helpful customer support agent..." />
                                     </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Widget Position</label>
+                                        <select value={position} onChange={(e) => setPosition(e.target.value)} className="w-full px-5 py-3.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all text-slate-800 bg-[#f8fafc] font-medium appearance-none">
+                                            <option value="bottom-right">Bottom Right</option>
+                                            <option value="bottom-left">Bottom Left</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
 
