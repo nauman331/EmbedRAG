@@ -48,6 +48,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const attemptSilentLogin = async () => {
+      // Widget routes don't need authentication — skip the auth attempt
+      if (window.location.pathname.startsWith('/widget/')) {
+        setIsInitializing(false);
+        return;
+      }
+
       try {
         const res = await fetchApi('/api/auth/refresh', {
           method: 'POST',
