@@ -165,12 +165,14 @@ const App: React.FC = () => {
           />
         </div>
 
-        <ChatWidget
-          botId={activeBotId}
-          botName={botConfig.name}
-          primaryColor={botConfig.colorHex}
-          welcomeMessage={botConfig.welcomeMessage}
-        />
+        <div className="hidden md:block">
+          <ChatWidget
+            botId={activeBotId}
+            botName={botConfig.name}
+            primaryColor={botConfig.colorHex}
+            welcomeMessage={botConfig.welcomeMessage}
+          />
+        </div>
       </div>
     );
   };
