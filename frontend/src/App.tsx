@@ -206,8 +206,15 @@ const App: React.FC = () => {
 
 const WidgetRoute = ({ botConfig }: { botConfig: any }) => {
   const { botId } = useParams<{ botId: string }>();
+
+  // Make the iframe fully transparent so only the chat bubble shows
+  useEffect(() => {
+    document.body.style.backgroundColor = 'transparent';
+    document.documentElement.style.backgroundColor = 'transparent';
+  }, []);
+
   return (
-    <div className="bg-transparent h-screen w-screen overflow-hidden">
+    <div style={{ background: 'transparent' }} className="h-screen w-screen overflow-hidden">
       <ChatWidget
         botId={botId || ''}
         botName={botConfig.name}
