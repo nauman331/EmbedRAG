@@ -35,6 +35,9 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     primaryColor = '#059669',
     welcomeMessage = 'Hi there! How can I help you today?'
 }) => {
+    // Detect if the widget is embedded in an iframe on another site
+    const isEmbedded = window.self !== window.top;
+
     // --- Standard Chat States ---
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
@@ -227,7 +230,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     };
 
     return (
-        <div className="fixed bottom-[100px] lg:bottom-6 right-4 lg:right-6 z-[9999] font-sans antialiased">
+        <div className={`fixed z-[9999] font-sans antialiased ${isEmbedded ? 'bottom-4 right-4' : 'bottom-[100px] lg:bottom-6 right-4 lg:right-6'}`}>
             <style>
                 {`
                 @keyframes chatOpen {
