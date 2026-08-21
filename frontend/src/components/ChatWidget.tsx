@@ -17,6 +17,16 @@ const getParentOrigin = (): string => {
     }
 };
 
+const getPositionParam = (): 'bottom-right' | 'bottom-left' => {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const pos = params.get('position');
+        return pos === 'bottom-left' ? 'bottom-left' : 'bottom-right';
+    } catch {
+        return 'bottom-right';
+    }
+};
+
 interface ChatWidgetProps {
     botId: string;
     botName?: string;
@@ -37,6 +47,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 }) => {
     // Detect if the widget is embedded in an iframe on another site
     const isEmbedded = window.self !== window.top;
+    const widgetPosition = getPositionParam();
 
     // --- Standard Chat States ---
     const [isOpen, setIsOpen] = useState(false);
@@ -229,8 +240,12 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
         });
     };
 
+    const positionClasses = widgetPosition === 'bottom-left'
+        ? (isEmbedded ? 'bottom-4 left-4' : 'bottom-[100px] lg:bottom-6 left-4 lg:left-6')
+        : (isEmbedded ? 'bottom-4 right-4' : 'bottom-[100px] lg:bottom-6 right-4 lg:right-6');
+
     return (
-        <div className={`fixed z-[9999] font-sans antialiased ${isEmbedded ? 'bottom-4 right-4' : 'bottom-[100px] lg:bottom-6 right-4 lg:right-6'}`}>
+        <div className={`fixed z-[9999] font-sans antialiased ${positionClasses}`}>
             <style>
                 {`
                 @keyframes chatOpen {
@@ -246,7 +261,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
 
             {isOpen && (
                 <div
-                    className="w-[360px] h-[600px] sm:w-[380px] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden mb-5 border border-slate-100 origin-bottom-right"
+                    className={`w-[360px] h-[600px] sm:w-[380px] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden mb-5 border border-slate-100 ${widgetPosition === 'bottom-left' ? 'origin-bottom-left' : 'origin-bottom-right'}`}
                     style={{ animation: 'chatOpen 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
                 >
                     {/* Header */}
@@ -409,7 +424,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
             {/* Floating Action Button (FAB) */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`absolute bottom-0 right-0 w-16 h-16 rounded-full text-white flex justify-center items-center transition-all duration-300 hover:-translate-y-1 hover:scale-105 group
+                className={`absolute bottom-0 ${widgetPosition === 'bottom-left' ? 'left-0' : 'right-0'} w-16 h-16 rounded-full text-white flex justify-center items-center transition-all duration-300 hover:-translate-y-1 hover:scale-105 group
                     ${isOpen ? 'scale-0 opacity-0 pointer-events-none' : 'scale-100 opacity-100'}
                 `}
                 style={{

@@ -19,8 +19,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
 
     const [botName, setBotName] = useState('');
     const [systemPrompt, setSystemPrompt] = useState('');
-    const [welcomeMessage, setWelcomeMessage] = useState('');
+    const [welcomeMessage, setWelcomeMessage] = useState("Hi there! How can I help you today?");
     const [colorHex, setColorHex] = useState('#000000');
+    const [position, setPosition] = useState('bottom-right');
 
     const [llmProvider, setLlmProvider] = useState<'GEMINI' | 'OPENAI' | 'ANTHROPIC'>('GEMINI');
     const [llmModel, setLlmModel] = useState('gemini-3.6-flash');
@@ -142,8 +143,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
                 if (response.ok) {
                     setBotName(data.name || '');
                     setSystemPrompt(data.systemPrompt || '');
-                    setWelcomeMessage(data.welcomeMessage || '');
+                    setWelcomeMessage(data.welcomeMessage || "Hi there! How can I help you today?");
                     setColorHex(data.colorHex || '#000000');
+                    setPosition(data.position || 'bottom-right');
 
                     if (data.llmProvider) setLlmProvider(data.llmProvider);
                     if (data.llmModel) setLlmModel(data.llmModel);
@@ -231,6 +233,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
                     systemPrompt,
                     welcomeMessage,
                     colorHex,
+                    position,
                     llmProvider,
                     llmModel,
                     apiKeys
@@ -318,6 +321,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
         link.click();
     };
 
+    const navItems = [
+        { id: 'analytics', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /></svg>, label: 'Dashboard' },
+        { id: 'inbox', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><polyline points="21 3 15 3 15 7 9 7 9 3 3 3 3 21 21 21 21 3z"></polyline><path d="M21 3L3 3M15 3L9 3"></path></svg>, label: 'Inbox' },
+        { id: 'leads', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>, label: 'Leads' },
+        { id: 'knowledge', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>, label: 'Documents' },
+        { id: 'settings', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>, label: 'Settings' },
+        { id: 'install', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>, label: 'Deploy' },
+        { id: 'security', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>, label: 'Security' }
+    ];
+
     return (
         <div className="w-full min-h-screen bg-[#f8fafc] font-sans flex flex-col">
             {!apiKeys.gemini && (
@@ -355,15 +368,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
                 {/* Floating Icon Sidebar */}
                 <aside className="hidden lg:flex relative w-20 flex-shrink-0 flex-col items-center py-6 gap-6 bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 z-10 h-[calc(100vh-120px)]">
                     {(() => {
-                        const navItems = [
-                            { id: 'analytics', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /></svg>, label: 'Dashboard' },
-                            { id: 'inbox', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><polyline points="21 3 15 3 15 7 9 7 9 3 3 3 3 21 21 21 21 3z"></polyline><path d="M21 3L3 3M15 3L9 3"></path></svg>, label: 'Inbox' },
-                            { id: 'leads', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>, label: 'Leads' },
-                            { id: 'knowledge', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>, label: 'Documents' },
-                            { id: 'settings', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>, label: 'Settings' },
-                            { id: 'install', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>, label: 'Deploy' },
-                            { id: 'security', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>, label: 'Security' }
-                        ];
                         const activeIndex = navItems.findIndex(n => n.id === activeTab);
 
                         return (
@@ -513,7 +517,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
                         </div>
                     )}
 
-                    { }
                     {activeTab === 'settings' && (
                         <div className="space-y-6">
                             <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/40 p-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -989,6 +992,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ botId }) => {
                         </div>
                     )}
                 </main>
+            </div>
+            
+            {/* Mobile Bottom Navigation */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 px-2 py-2 flex justify-between items-center shadow-[0_-4px_20px_rgba(0,0,0,0.05)] overflow-x-auto">
+                {navItems.map((item) => (
+                    <button
+                        key={item.id}
+                        onClick={() => setActiveTab(item.id as any)}
+                        className={`flex flex-col flex-shrink-0 items-center justify-center w-12 h-12 rounded-xl transition-all ${activeTab === item.id ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                    >
+                        {React.cloneElement(item.icon as any, { 
+                            width: "20", 
+                            height: "20",
+                            strokeWidth: activeTab === item.id ? "2.5" : "2" 
+                        })}
+                    </button>
+                ))}
             </div>
         </div>
     );

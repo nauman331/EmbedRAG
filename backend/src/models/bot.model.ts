@@ -8,6 +8,7 @@ export interface IBot extends Document {
     systemPrompt: string;
     welcomeMessage: string;
     colorHex: string;
+    position: 'bottom-right' | 'bottom-left';
     isLive: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -47,6 +48,11 @@ const BotSchema: Schema = new Schema(
         colorHex: {
             type: String,
             default: "#000000",
+        },
+        position: {
+            type: String,
+            enum: ['bottom-right', 'bottom-left'],
+            default: 'bottom-right',
         },
         isLive: {
             type: Boolean,

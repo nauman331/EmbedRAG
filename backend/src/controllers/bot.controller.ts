@@ -153,16 +153,29 @@ export const getEmbedScript = async (req: Request, res: Response): Promise<any> 
         const botId = req.params.id;
         const frontendUrl = process.env.FRONTEND_URL;
 
+        // Fetch bot to get position setting
+        const bot = await Bot.findById(botId);
+        if (!bot) {
+            return res.status(404).send('console.error("EmbedAI: Bot not found");');
+        }
+        const position = bot.position || 'bottom-right';
+
         // The script validates postMessage origin to prevent cross-origin spoofing
         const script = `
             (function() {
                 var allowedOrigin = '${frontendUrl}';
                 var iframe = document.createElement('iframe');
                 // Pass the parent's actual origin as a query param so the widget can target postMessage correctly
-                iframe.src = allowedOrigin + '/widget/${botId}?parentOrigin=' + encodeURIComponent(window.location.origin);
+                iframe.src = allowedOrigin + '/widget/${botId}?position=${position}&parentOrigin=' + encodeURIComponent(window.location.origin);
                 iframe.style.position = 'fixed';
                 iframe.style.bottom = '0';
-                iframe.style.right = '0';
+                
+                if ('${position}' === 'bottom-left') {
+                    iframe.style.left = '0';
+                } else {
+                    iframe.style.right = '0';
+                }
+                
                 iframe.style.width = '100px';
                 iframe.style.height = '100px';
                 iframe.style.border = 'none';
