@@ -45,7 +45,7 @@ services:
     headers:
       - path: /*
         name: X-Frame-Options
-        value: ""
+        value: ALLOWALL
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
