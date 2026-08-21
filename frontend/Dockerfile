@@ -34,7 +34,7 @@ RUN echo 'server { \
     # Security headers \
     add_header X-Content-Type-Options "nosniff"; \
     add_header Referrer-Policy "strict-origin-when-cross-origin"; \
-    add_header Content-Security-Policy "default-src '\''self'\''; script-src '\''self'\'' '\''unsafe-inline'\''; style-src '\''self'\'' '\''unsafe-inline'\'' https://fonts.googleapis.com; font-src '\''self'\'' https://fonts.gstatic.com; connect-src '\''self'\'' wss: https:; img-src '\''self'\'' data: https:; frame-ancestors '\''self'\'';"; \
+    add_header Content-Security-Policy "default-src '\''self'\''; script-src '\''self'\'' '\''unsafe-inline'\''; style-src '\''self'\'' '\''unsafe-inline'\'' https://fonts.googleapis.com; font-src '\''self'\'' https://fonts.gstatic.com; connect-src '\''self'\'' wss: https:; img-src '\''self'\'' data: https:; frame-ancestors *;"; \
     \
     # Serve static assets with long cache \
     location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff2?)$ { \
